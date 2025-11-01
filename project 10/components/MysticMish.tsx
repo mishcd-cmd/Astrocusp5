@@ -21,7 +21,7 @@ if (typeof Platform === 'undefined') {
   (global as any).Platform = { OS: 'web' };
 }
 
-// ✅ Pre-import the avatar image for better type safety
+// Pre-import the avatar image
 const mishAvatar = require('../assets/images/mystic-mish/headshot.png');
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -30,59 +30,6 @@ interface MysticMishProps {
   onRitualReveal?: (ritual: string) => void;
   hemisphere: 'Northern' | 'Southern';
 }
-
-// Ritual data (kept as-is; currently unused in the welcome line, but ready for future variants)
-const RITUALS = {
-  newMoon: [
-    '🌑 **New Moon Manifestation**: Write your intentions on paper, fold it three times, and place it under your pillow.',
-    '🕯️ **Fresh Start Ritual**: Light a black candle to banish old energy, then a white one for new beginnings.',
-    '✨ **Seed Planting**: Write down three goals and bury the paper in a small pot with a seed or plant.',
-    '🌑 **Spell of the Silver Seed**: The new moon is coming on the 23rd - A ritual for planting new beginnings under the dark sky of the New Moon - see full spell.',
-    "🦁 **Fire Mirror Ritual** (Leo New Moon): Light a gold candle in front of a mirror. Gaze at your reflection and whisper: 'I see the fire. I call it higher.' Write self-praise on a bay leaf and burn it safely. *Mish's Tip: Confidence is a spell—cast it daily with your posture and voice.*",
-    "♍ **Herbal Pouch Spell** (Virgo New Moon): Create a pouch with lavender, rosemary, and quartz for cleansing routines. *Mish's Tip: Your daily rituals are spells—make them sacred.*",
-  ],
-  waxingCrescent: [
-    '🌒 **Crescent Growth**: Place a silver coin in water overnight, then use the water to nurture a plant.',
-    '📝 **Intention Amplification**: Write your goals with green ink and place the paper where moonlight can touch it.',
-    '🔮 **Forward Motion**: Walk clockwise in a circle while visualizing your dreams growing stronger.',
-    "💬 **Voice Reclamation Ritual** (Mercury Direct): Write sigils over your journal with lemon balm ink to reclaim your authentic voice. *Mish's Tip: Your words are spells—choose them like magic.*",
-  ],
-  firstQuarter: [
-    '🌓 **Decision Ritual**: Place two candles representing choices, light the one that feels right.',
-    '⚖️ **Balance Working**: Hold a small stone in each hand, feel their weight, then choose which to keep.',
-    '🌱 **Growth Acceleration**: Water a plant while speaking your intentions aloud.',
-  ],
-  waxingGibbous: [
-    '🌔 **Refinement Spell**: Edit a list of goals, making them more specific and aligned.',
-    '✂️ **Cutting Away**: Use scissors to cut paper representing obstacles in your path.',
-    '📈 **Energy Building**: Charge a crystal in sunlight, then carry it close to your heart.',
-    "🪐 **Portal of Prosperity** (Lionsgate 8/8): Arrange 8 coins in an infinity shape with citrine at centre. Sip sun-charged water and journal: 'I open the gate. I walk with fate.' *Mish's Tip: Think bigger—manifest worth, not just wealth.*",
-    "💖 **Rose Water Love Bath** (Venus-Jupiter): Add rose petals to your bath for soul-nourishing love and abundance. *Mish's Tip: Love yourself first—the universe is watching.*",
-  ],
-  fullMoon: [
-    '🌕 **Full Moon Release**: Write what you want to release on paper and safely burn it under moonlight.',
-    '💧 **Moon Water Blessing**: Place a bowl of water under the full moon to charge it with lunar energy.',
-    '✨ **Illumination Ritual**: Meditate with a white candle and ask for clarity on your path.',
-    "🌕 **Electric Thread Ritual** (Aquarius Full Moon): Tie silver thread around your wrist, hold the other end to the moon saying: 'I am connected, expanded, awake.' Write 3 visionary ideas with actions. *Mish's Tip: The world needs your weird—honour your unique code.*",
-  ],
-  waningGibbous: [
-    "🌖 **Gratitude Flow**: List all that you're thankful for and speak each item aloud.",
-    '🧹 **Gentle Clearing**: Sweep your home with intention, visualizing clearing away stagnant energy.',
-    '🍵 **Healing Tea**: Brew a cup of tea with healing intention, sipping slowly and mindfully.',
-    "💫 **Glamour Spell** (Venus in Leo): Use rose petals and gold shimmer to amplify your magnetism. *Mish's Tip: You are the magic—dress like it.*",
-  ],
-  lastQuarter: [
-    '🌗 **Release Ritual**: Write down what no longer serves you and tear the paper into pieces.',
-    '🧿 **Protection Working**: Place a blue object near your door to ward off negative energy.',
-    "🔄 **Cycle Completion**: Draw a circle and divide it in four, marking what phase of life you're in.",
-  ],
-  waningCrescent: [
-    "🌘 **Final Release**: Wash your hands in salt water to cleanse away the last of what you're releasing.",
-    '🌿 **Rest & Recover**: Create a small altar with restful items like lavender or chamomile.',
-    "📉 **Surrender Practice**: Write 'I release control of...' and complete the sentence five times.",
-    "🪐 **Money Altar Refresh** (Jupiter Retrograde): Refresh your abundance altar with cinnamon, coins, and gratitude. *Mish's Tip: Abundance flows to grateful hearts.*",
-  ],
-};
 
 export default function MysticMish({
   onRitualReveal,
@@ -94,7 +41,7 @@ export default function MysticMish({
   const [showRitual, setShowRitual] = useState(false);
   const [moonPhase, setMoonPhase] = useState(getCurrentMoonPhase());
   const [planetaryPositions, setPlanetaryPositions] = useState<any[]>([]);
-  const [hasAccess, setHasAccess] = useState(true); // ← default to true (soft gate)
+  const [hasAccess, setHasAccess] = useState(true); // soft gate
   const [imageError, setImageError] = useState(false);
 
   const isMounted = useRef(true);
@@ -110,7 +57,6 @@ export default function MysticMish({
     setMoonPhase(currentMoon);
 
     try {
-      // Try with hemisphere if your util supports it; fall back otherwise
       const positions =
         typeof getCurrentPlanetaryPositionsEnhanced === 'function'
           ? await getCurrentPlanetaryPositionsEnhanced(hemisphere as any)
@@ -120,19 +66,19 @@ export default function MysticMish({
       setPlanetaryPositions([]);
     }
 
-    // Your current default message (kept intact)
-    const welcomeRitual =
-      'Spooky! Halloween is nearby and there is some prep to do before unleashing with spells!- see the Mystic Mish tab to find out';
+    // Exact requested popup message
+    const message =
+      'November energy is strong and includes the years 1st micro moon, See Mystic Mish tab for more';
 
     if (isMounted.current) {
-      setCurrentRitual(welcomeRitual);
+      setCurrentRitual(message);
       setIsVisible(true);
       startAnimations();
     }
   };
 
   const startAnimations = () => {
-    // Keep iOS light for perf
+    // Keep iOS light for performance
     if (Platform.OS === 'ios') return;
 
     // Floating
@@ -210,20 +156,17 @@ export default function MysticMish({
   useEffect(() => {
     isMounted.current = true;
 
-    // Soft subscription check (does NOT gate rendering)
+    // Soft subscription check
     const checkAccess = async () => {
       try {
         const { getSubscriptionStatus } = await import('@/utils/billing');
         const subscriptionStatus = await getSubscriptionStatus();
-        console.log('🔍 [MysticMish] Subscription check:', subscriptionStatus);
         if (isMounted.current) {
-          // allow if active is true OR undefined
           const allowed = subscriptionStatus?.active !== false;
           setHasAccess(allowed);
         }
-      } catch (error) {
-        console.error('❌ [MysticMish] Access check error:', error);
-        if (isMounted.current) setHasAccess(true); // fail-open to keep Mish visible
+      } catch {
+        if (isMounted.current) setHasAccess(true);
       }
     };
 
@@ -246,7 +189,7 @@ export default function MysticMish({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hemisphere]);
 
-  // Auto-hide ritual popup after a while (keeps avatar visible)
+  // Auto-hide ritual popup after a while
   useEffect(() => {
     if (!showRitual) return;
     const timer = setTimeout(() => {
@@ -255,7 +198,6 @@ export default function MysticMish({
     return () => clearTimeout(timer);
   }, [showRitual]);
 
-  // 🔑 IMPORTANT: we no longer gate on hasAccess here
   if (!isVisible) return null;
 
   const floatTransform = floatAnimation.interpolate({
@@ -394,7 +336,7 @@ export default function MysticMish({
             {Platform.OS !== 'ios' && <View style={styles.glowEffect} />}
           </View>
 
-          {/* Little “!” bubble */}
+          {/* Little ! bubble */}
           <View style={styles.speechBubble}>
             <Text style={styles.speechText}>!</Text>
           </View>
@@ -407,7 +349,7 @@ export default function MysticMish({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 120, // near the Daily title
+    top: 120,
     left: 15,
     zIndex: 1000,
     pointerEvents: 'box-none',

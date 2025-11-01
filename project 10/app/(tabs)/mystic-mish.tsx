@@ -1,3 +1,4 @@
+// app/(tabs)/MysticMish.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -24,7 +25,7 @@ if (typeof Platform === 'undefined') {
   (global as any).Platform = { OS: 'web' };
 }
 
-// ✅ Pre-import the avatar image for better type safety (renamed to lowercase, no spaces)
+// ✅ Pre-import the avatar image
 const mishAvatar = require('../../assets/images/mystic-mish/headshot.png');
 
 export default function MysticMishScreen() {
@@ -36,15 +37,11 @@ export default function MysticMishScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const loadData = async () => {
       let subscriptionStatus: any;
       try {
-        console.log('🔍 [mystic-mish] Checking subscription status...');
         subscriptionStatus = await getSubscriptionStatus();
-        console.log('🔍 [mystic-mish] Subscription result:', subscriptionStatus);
-        
-        // Load moon phase
         const phase = getCurrentMoonPhase();
         setMoonPhase(phase);
       } catch (error) {
@@ -58,183 +55,127 @@ export default function MysticMishScreen() {
         }
       }
     };
-    
+
     loadData();
-    
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const handleUpgrade = () => {
-    router.push('/subscription');
-  };
+  const handleUpgrade = () => router.push('/subscription');
+  const handleSettings = () => router.push('/(tabs)/settings');
+  const handleAccount = () => router.push('/settings');
 
-  const handleSettings = () => {
-    router.push('/(tabs)/settings');
-  };
-
-  const handleAccount = () => {
-    router.push('/settings');
-  };
-
-  // === Beltane (Southern) ===
-  const southernEclipseSpell = {
-    title: '🌺 The Wild Green Awakening',
-    subtitle: '🌸 Southern Hemisphere Beltane Spell',
+  // === November Spells (Southern Hemisphere focus) ===
+  const southernNovemberSpell = {
+    title: '🌸 The Flower Moon Grounding',
+    subtitle: 'Full Moon in Taurus - Southern',
     description:
-      "A ritual for sensual rebirth and life force ignition as spring reaches its ecstatic peak",
+      'A grounding ritual for blossoming growth and sensual calm as the season expands',
     seasonalContext:
-      "While the North walks with ghosts, the South dances with life erupting. October here is Beltane season — spring's passionate crescendo before summer's fullness. The witch's wheel turns towards fire, fertility, and unbridled creative force.",
-    fullSpell: `🌸 Southern Hemisphere Beltane Spell
-🌺 The Wild Green Awakening
-A ritual for sensual rebirth and life force ignition as spring reaches its ecstatic peak
+      'November in the South carries Flower Moon tone. Beauty is rising. Anchor growth with steady earth magic.',
+    fullSpell: `Full Moon in Taurus - Southern
+Theme: grounding, stability, sensual renewal
+Items: moss agate, rose quartz, carnelian
+Herbs: thyme, patchouli, cinnamon
+Colors: deep green, copper, cream
 
-Seasonal Context:
-While the North walks with ghosts, the South dances with life erupting. October here is Beltane season — spring's passionate crescendo before summer's fullness. The witch's wheel turns towards fire, fertility, and unbridled creative force.
-
-Moon Phase:
-Waxing towards Full (building power, manifestation)
-
-Elements:
-Fire & Earth
-
-🔥 What You'll Need
-• Red or green candle (vitality and growth)
-• Fresh flowers (jasmine, rose, or whatever blooms near you)
-• Honey (sweetness of life)
-• Small bowl of soil
-• Ribbon (red, green, or white)
-• Your favourite sensual oil or perfume
-
-🌿 Steps
-1. Ground in the Green
-Stand barefoot on earth or hold your bowl of soil.
-Feel the rising life force beneath you — roots drinking, seeds splitting, everything reaching.
-Say:
-"From winter's sleep, the wild awakes,
-The Earth herself now stirs and shakes."
-
-2. Anoint and Invoke
-Dab oil on your pulse points — wrists, throat, heart.
-Light your candle and say:
-"I am the blossom and the thorn,
-The sensual, the fierce, reborn.
-Life moves through me, strong and free—
-As spring ignites, so too do I decree."
-
-3. Weave Your Intention
-Take your ribbon and tie it loosely around your wrist.
-As you tie it, speak aloud what you're calling into bloom:
-Creativity? Passion? New projects? Love? Vitality?
-Say:
-"By fire and flower, soil and sun,
-I call what I desire — let it be done.
-No timid seed, no cautious start—
-I bloom with wildness in my heart."
-
-4. The Honey Blessing
-Place a drop of honey on your tongue.
-Feel the sweetness.
-Say:
-"Life is sweet, and life is mine.
-I drink the nectar, I taste the divine."
-
-5. Flower Offering
-Scatter your fresh flowers — some on your altar, some outside for the land, some in water to float and release.
-As you scatter them:
-"For the Earth who feeds me,
-For the fire that frees me,
-For the spring that sees me—
-I give beauty back to the world."
-
-6. Dance the Ignition
-Move your body. Put on music. Let the vitality you've invoked move through you.
-Even one minute of wild, free movement seals the spell.
-
-✨ Optional Touch:
-Keep the ribbon on for three days, then tie it to a tree as an offering. Plant something — even a single seed in a pot — to ground your Beltane magic into physical form.
-
-🌙 Blessed Samhain, blessed Beltane — may the wheel turn well for you, wherever you stand upon it.`,
-    moonPhase: 'Waxing to Full',
-    element: 'Fire & Earth',
+Steps
+1) Create an earthy altar with stones and soft candlelight.
+2) Anoint palms and trace small spirals over heart and hips.
+3) Light an intention candle for what you nourish this month.
+4) Speak:
+"Root me in the soil of serenity.
+Let what I build be blessed and steady.
+I call in pleasure, patience, peace.
+The world turns slow, my heart finds ease."
+5) Bury a coin or seed in soil to anchor abundance.`.trim(),
+    moonPhase: 'Full Moon in Taurus',
+    element: 'Earth',
   };
 
-  // === Samhain (Northern) ===
-  const northernEclipseSpell = {
-    title: "🕯️ The Veil Walker's Binding",
-    subtitle: '🎃 Northern Hemisphere Samhain Spell',
+  const southernNovemberNewMoon = {
+    title: '🌑 The Shadow Bloom',
+    subtitle: 'New Moon in Scorpio - Southern',
     description:
-      'A ritual for ancestral connection and protective passage through the thinning veil',
+      'A transformation rite that turns release into rebirth with early summer pulse',
     seasonalContext:
-      "The autumn harvest reaches its final breath as October descends towards Samhain — the moment when summer's death becomes winter's gestation. The veil between worlds grows gossamer-thin, and those with sight may glimpse what lies beyond.",
-    fullSpell: `🎃 Northern Hemisphere Samhain Spell
-🕯️ The Veil Walker's Binding
-A ritual for ancestral connection and protective passage through the thinning veil
+      'Scorpio New Moon meets rising warmth. Rebirth comes through passion and courage. Express your change outwardly.',
+    fullSpell: `New Moon in Scorpio - Southern
+Theme: transformation, mystery, rebirth
+Items: obsidian, smoky quartz, labradorite
+Herbs: mugwort, sage, myrrh
+Colors: black, indigo, silver
 
-Seasonal Context:
-The autumn harvest reaches its final breath as October descends towards Samhain — the moment when summer's death becomes winter's gestation. The veil between worlds grows gossamer-thin, and those with sight may glimpse what lies beyond.
+Steps
+1) Dim the room and sit with one candle.
+2) Write what you will release and burn it safely with gratitude.
+3) Anoint wrists and trace a crescent over each pulse.
+4) Sit in quiet and picture a gentle inner glow.
 
-Moon Phase:
-Waning Moon moving towards Dark Moon (ideal for shadow work and ancestral communion)
+Incantation:
+"In darkness, I remember my light.
+What I release becomes new life.
+I trust my shadows to teach me grace.
+I am reborn within this sacred space."`.trim(),
+    moonPhase: 'New Moon in Scorpio',
+    element: 'Water',
+  };
 
-Elements:
-Fire & Spirit
+  // === November Spells (Northern Hemisphere focus) ===
+  const northernNovemberSpell = {
+    title: '❄️ The Frost Moon Resting',
+    subtitle: 'Full Moon in Taurus - Northern',
+    description:
+      'A steadying rite for warmth, rest, and completion as the world cools',
+    seasonalContext:
+      'November in the North carries Frost Moon tone. Stillness is growth. Let endings become winter seed.',
+    fullSpell: `Full Moon in Taurus - Northern
+Theme: grounding, stability, sensual renewal
+Items: moss agate, rose quartz, carnelian
+Herbs: thyme, patchouli, cinnamon
+Colors: deep green, copper, cream
 
-🔥 What You'll Need
-• Orange or black candle (the threshold flame)
-• Dried autumn leaves or herbs (rosemary, mugwort, or sage)
-• Small mirror or reflective surface
-• Photograph of an ancestor or mentor (or blank paper for unknown guides)
-• Apple (symbol of the otherworld)
-• Salt or ash (protection)
+Steps
+1) Build a simple altar that feels warm and calm.
+2) Anoint palms and trace spirals over heart and hips to ground.
+3) Light an intention candle for steady progress.
+4) Speak:
+"Root me in the soil of serenity.
+Let what I build be blessed and steady.
+I call in pleasure, patience, peace.
+The world turns slow, my heart finds ease."
+5) Place a coin or seed into soil to symbolize safe growth through winter.`.trim(),
+    moonPhase: 'Full Moon in Taurus',
+    element: 'Earth',
+  };
 
-🌙 Steps
-1. Cast the Circle
-Sprinkle salt or ash in a circle around your workspace, moving counter-clockwise (the direction of the thinning veil).
-Whisper:
-"As the wheel turns towards the dark,
-I call the guardians, I light the spark."
+  const northernNovemberNewMoon = {
+    title: '🌑 The Shadow Bloom',
+    subtitle: 'New Moon in Scorpio - Northern',
+    description:
+      'A quiet rebirth rite that honors deep stillness and soul alchemy',
+    seasonalContext:
+      'Scorpio New Moon arrives with late autumn descent. The vision forms within the dark and the quiet.',
+    fullSpell: `New Moon in Scorpio - Northern
+Theme: transformation, mystery, rebirth
+Items: obsidian, smoky quartz, labradorite
+Herbs: mugwort, sage, myrrh
+Colors: black, indigo, silver
 
-2. Light the Threshold
-Kindle your candle and gaze into its flame.
-Say:
-"Between the living and the gone,
-Between the dusk and coming dawn,
-I stand where two worlds briefly meet—
-I honour those whose path's complete."
+Steps
+1) Darken the room and sit with a single flame.
+2) Write what you release and burn it safely with thanks.
+3) Anoint wrists and trace a crescent over each pulse.
+4) Sit in silence and sense your inner light returning.
 
-3. Speak to the Mirror
-Hold the mirror before the candle. See your reflection flicker.
-Place the photograph or paper before it.
-Say the name of your ancestor or simply:
-"To those who walked before my time,
-Whose blood runs ancient through this line—
-Show me what I need to see,
-Lend your wisdom, set it free."
-
-4. The Apple Offering
-Cut the apple crosswise to reveal the pentagram star within.
-Eat half slowly, with intention.
-Leave half on your altar or beneath a tree as offering.
-
-5. Burn and Release
-Place dried leaves in a fireproof dish and set them alight with your candle.
-As they burn, say:
-"What must pass, I let it burn.
-What must come, I wait its turn.
-Through smoke and flame, the message sent—
-Between the worlds, my prayer is spent."
-
-6. Close the Veil
-Thank your ancestors. Extinguish the candle with wet fingers (never blow—respect the threshold).
-Break the salt circle, sweeping clockwise.
-Carry the protective herb ash in a small pouch for the season.
-
-✨ Optional Touch:
-Leave a candle burning in your window on Samhain night to guide helpful spirits and honour the beloved dead.`,
-    moonPhase: 'Waning to Dark Moon',
-    element: 'Fire & Spirit',
+Incantation:
+"In darkness, I remember my light.
+What I release becomes new life.
+I trust my shadows to teach me grace.
+I am reborn within this sacred space."`.trim(),
+    moonPhase: 'New Moon in Scorpio',
+    element: 'Water',
   };
 
   if (loading) {
@@ -251,20 +192,18 @@ Leave a candle burning in your window on Samhain night to guide helpful spirits 
     );
   }
 
-  // Show paywall if no access
+  // Paywall
   if (!hasAccess) {
     return (
       <View style={styles.container}>
         <CosmicBackground />
         <SafeAreaView style={styles.safeArea}>
           <ScrollView contentContainerStyle={styles.scrollContent}>
-            {/* Header */}
             <View style={styles.headerCenter}>
               <Text style={styles.title}>Mystic Mish</Text>
               <Text style={styles.subtitle}>Your Cosmic Guide & Ritual Keeper</Text>
             </View>
 
-            {/* Paywall */}
             <LinearGradient
               colors={['rgba(212, 175, 55, 0.2)', 'rgba(212, 175, 55, 0.1)']}
               style={styles.paywallCard}
@@ -273,12 +212,11 @@ Leave a candle burning in your window on Samhain night to guide helpful spirits 
                 <Crown size={32} color="#d4af37" />
                 <Text style={styles.paywallTitle}>Unlock Mystic Mish</Text>
               </View>
-              
+
               <Text style={styles.paywallDescription}>
-                Access Mystic Mish's sacred spells, moon rituals, and cosmic wisdom with Astral Plane.
+                Access Mystic Mish spells, moon rituals, and cosmic wisdom with Astral Plane.
               </Text>
-              
-              {/* Mystic Mish Preview */}
+
               <View style={styles.mishPreviewContainer}>
                 <Image
                   source={mishAvatar}
@@ -293,26 +231,26 @@ Leave a candle burning in your window on Samhain night to guide helpful spirits 
                   </View>
                 )}
               </View>
-              
+
               <View style={styles.featuresList}>
                 <View style={styles.featureItem}>
                   <Scroll size={16} color="#d4af37" />
-                  <Text style={styles.featureText}>Sacred spells & rituals</Text>
+                  <Text style={styles.featureText}>Sacred spells and rituals</Text>
                 </View>
                 <View style={styles.featureItem}>
                   <Moon size={16} color="#d4af37" />
-                  <Text style={styles.featureText}>Moon phase magic guidance</Text>
+                  <Text style={styles.featureText}>Moon phase guidance</Text>
                 </View>
                 <View style={styles.featureItem}>
                   <Sparkles size={16} color="#d4af37" />
-                  <Text style={styles.featureText}>Cusp-specific magical practices</Text>
+                  <Text style={styles.featureText}>Cusp specific practices</Text>
                 </View>
                 <View style={styles.featureItem}>
                   <Eye size={16} color="#d4af37" />
-                  <Text style={styles.featureText}>Mystic wisdom & cosmic tips</Text>
+                  <Text style={styles.featureText}>Mystic tips and wisdom</Text>
                 </View>
               </View>
-              
+
               <CosmicButton
                 title="Upgrade to Astral Plane"
                 onPress={handleUpgrade}
@@ -329,18 +267,21 @@ Leave a candle burning in your window on Samhain night to guide helpful spirits 
     {
       icon: <Moon size={20} color="#d4af37" />,
       title: 'Moon Phase Magic',
-      tip: 'New moons are for setting intentions, full moons for releasing and manifesting. Waxing moons grow your desires, waning moons help you let go.'
+      tip:
+        'New moons invite intentions. Full moons support release and blessing. Waxing builds. Waning clears.',
     },
     {
       icon: <Sparkles size={20} color="#8b9dc3" />,
       title: 'Cusp Power',
-      tip: 'If you\'re on a cusp, you have access to dual energies. Use this to your advantage in spells - you can work with both signs\' ruling planets and elements.'
+      tip:
+        "If you are on a cusp, you can work both signs. Blend ruling planets and elements to fit your intention.",
     },
     {
       icon: <Star size={20} color="#d4af37" />,
       title: 'Daily Practice',
-      tip: 'Small daily rituals are more powerful than elaborate monthly ones. Light a candle with intention, speak an affirmation, or simply pause to connect with cosmic energy.'
-    }
+      tip:
+        'Small daily rituals compound. Light a candle, speak one line, breathe with intention.',
+    },
   ];
 
   return (
@@ -351,15 +292,14 @@ Leave a candle burning in your window on Samhain night to guide helpful spirits 
           <View style={styles.headerCenter}>
             <Text style={styles.headerIcon}>✨</Text>
             <Text style={styles.headerTitle}>Mystic Mish</Text>
-            <Text style={styles.headerSubtitle}>Your Cosmic Guide & Ritual Keeper</Text>
+            <Text style={styles.headerSubtitle}>Your Cosmic Guide and Ritual Keeper</Text>
           </View>
 
-          {/* Mish Avatar & Welcome */}
+          {/* Avatar and welcome */}
           <LinearGradient
             colors={['rgba(212, 175, 55, 0.2)', 'rgba(139, 157, 195, 0.1)']}
             style={styles.welcomeCard}
           >
-            {/* Mystic Mish Avatar */}
             <View style={styles.mishAvatarContainer}>
               <Image
                 source={mishAvatar}
@@ -374,12 +314,11 @@ Leave a candle burning in your window on Samhain night to guide helpful spirits 
                 </View>
               )}
             </View>
-            
+
             <View style={styles.welcomeContent}>
-              <Text style={styles.welcomeTitle}>Welcome, cosmic soul! ✨</Text>
+              <Text style={styles.welcomeTitle}>Welcome, cosmic soul</Text>
               <Text style={styles.welcomeText}>
-                I'm Mystic Mish, your guide through the celestial realms. I appear when the cosmic energies are ripe for magic and ritual work. 
-                Let me share the ancient wisdom of moon cycles, spell craft, and cosmic timing.
+                I am Mystic Mish. I appear when the energy is ripe for magic. Let us align your ritual to the month and the moon.
               </Text>
             </View>
           </LinearGradient>
@@ -393,103 +332,171 @@ Leave a candle burning in your window on Samhain night to guide helpful spirits 
               <Moon size={24} color="#d4af37" />
               <Text style={styles.moonTitle}>Seasonal Rituals</Text>
             </View>
-            
+
             {moonPhase && (
               <Text style={styles.moonPhaseText}>
                 Current Moon: {moonPhase.phase} ({moonPhase.illumination}% illuminated)
               </Text>
             )}
-            
+
+            {/* Updated headline message */}
             <Text style={styles.moonMessage}>
-              Southern: Beltane energy is rising 🌸 • Northern: Samhain veil is thinning 🕯️
+              November energy is strong and includes the years 1st micro moon. See spells below.
             </Text>
             <Text style={styles.moonDescription}>
-              Explore your hemisphere’s full ritual below to align with the current seasonal magic.
+              Choose the version that fits your hemisphere and the moon you plan to work with.
             </Text>
           </LinearGradient>
 
-          {/* Southern Hemisphere Spell */}
+          {/* Southern Hemisphere Spells */}
           <View style={styles.spellsSection}>
-            <Text style={styles.sectionTitle}>🌍 Southern Hemisphere — Beltane Ritual</Text>
-            
+            <Text style={styles.sectionTitle}>🌍 Southern Hemisphere Spells</Text>
+
+            {/* Southern Full Moon */}
             <LinearGradient
               colors={['rgba(212, 175, 55, 0.2)', 'rgba(212, 175, 55, 0.1)']}
               style={styles.spellCard}
             >
               <View style={styles.spellHeader}>
                 <Scroll size={20} color="#d4af37" />
-                <Text style={styles.spellTitle}>{southernEclipseSpell.title}</Text>
+                <Text style={styles.spellTitle}>{southernNovemberSpell.title}</Text>
               </View>
-              
-              <Text style={styles.spellSubtitle}>{southernEclipseSpell.subtitle}</Text>
-              <Text style={styles.spellDescription}>{southernEclipseSpell.description}</Text>
-              
+              <Text style={styles.spellSubtitle}>{southernNovemberSpell.subtitle}</Text>
+              <Text style={styles.spellDescription}>{southernNovemberSpell.description}</Text>
+
               <View style={styles.seasonalContextContainer}>
-                <Text style={styles.seasonalContextTitle}>Seasonal Context:</Text>
-                <Text style={styles.seasonalContextText}>{southernEclipseSpell.seasonalContext}</Text>
+                <Text style={styles.seasonalContextTitle}>Seasonal Context</Text>
+                <Text style={styles.seasonalContextText}>{southernNovemberSpell.seasonalContext}</Text>
               </View>
-              
+
               <View style={styles.spellDetails}>
                 <View style={styles.spellDetailItem}>
-                  <Text style={styles.spellDetailLabel}>Moon Phase:</Text>
-                  <Text style={styles.spellDetailValue}>{southernEclipseSpell.moonPhase}</Text>
+                  <Text style={styles.spellDetailLabel}>Moon Phase</Text>
+                  <Text style={styles.spellDetailValue}>{southernNovemberSpell.moonPhase}</Text>
                 </View>
                 <View style={styles.spellDetailItem}>
-                  <Text style={styles.spellDetailLabel}>Elements:</Text>
-                  <Text style={styles.spellDetailValue}>{southernEclipseSpell.element}</Text>
+                  <Text style={styles.spellDetailLabel}>Element</Text>
+                  <Text style={styles.spellDetailValue}>{southernNovemberSpell.element}</Text>
                 </View>
               </View>
-              
+
               <View style={styles.fullSpellContainer}>
-                <Text style={styles.fullSpellTitle}>The Ritual:</Text>
-                <Text style={styles.fullSpellText}>{southernEclipseSpell.fullSpell}</Text>
+                <Text style={styles.fullSpellTitle}>The Ritual</Text>
+                <Text style={styles.fullSpellText}>{southernNovemberSpell.fullSpell}</Text>
+              </View>
+            </LinearGradient>
+
+            {/* Southern New Moon */}
+            <LinearGradient
+              colors={['rgba(212, 175, 55, 0.2)', 'rgba(212, 175, 55, 0.1)']}
+              style={styles.spellCard}
+            >
+              <View style={styles.spellHeader}>
+                <Scroll size={20} color="#d4af37" />
+                <Text style={styles.spellTitle}>{southernNovemberNewMoon.title}</Text>
+              </View>
+              <Text style={styles.spellSubtitle}>{southernNovemberNewMoon.subtitle}</Text>
+              <Text style={styles.spellDescription}>{southernNovemberNewMoon.description}</Text>
+
+              <View style={styles.seasonalContextContainer}>
+                <Text style={styles.seasonalContextTitle}>Seasonal Context</Text>
+                <Text style={styles.seasonalContextText}>{southernNovemberNewMoon.seasonalContext}</Text>
+              </View>
+
+              <View style={styles.spellDetails}>
+                <View style={styles.spellDetailItem}>
+                  <Text style={styles.spellDetailLabel}>Moon Phase</Text>
+                  <Text style={styles.spellDetailValue}>{southernNovemberNewMoon.moonPhase}</Text>
+                </View>
+                <View style={styles.spellDetailItem}>
+                  <Text style={styles.spellDetailLabel}>Element</Text>
+                  <Text style={styles.spellDetailValue}>{southernNovemberNewMoon.element}</Text>
+                </View>
+              </View>
+
+              <View style={styles.fullSpellContainer}>
+                <Text style={styles.fullSpellTitle}>The Ritual</Text>
+                <Text style={styles.fullSpellText}>{southernNovemberNewMoon.fullSpell}</Text>
               </View>
             </LinearGradient>
           </View>
 
-          {/* Northern Hemisphere Spell */}
+          {/* Northern Hemisphere Spells */}
           <View style={styles.spellsSection}>
-            <Text style={styles.sectionTitle}>🌎 Northern Hemisphere — Samhain Ritual</Text>
-            
+            <Text style={styles.sectionTitle}>🌎 Northern Hemisphere Spells</Text>
+
+            {/* Northern Full Moon */}
             <LinearGradient
               colors={['rgba(139, 157, 195, 0.15)', 'rgba(139, 157, 195, 0.05)']}
               style={styles.spellCard}
             >
               <View style={styles.spellHeader}>
                 <Scroll size={20} color="#8b9dc3" />
-                <Text style={styles.spellTitle}>{northernEclipseSpell.title}</Text>
+                <Text style={styles.spellTitle}>{northernNovemberSpell.title}</Text>
               </View>
-              
-              <Text style={styles.spellSubtitle}>{northernEclipseSpell.subtitle}</Text>
-              <Text style={styles.spellDescription}>{northernEclipseSpell.description}</Text>
-              
+              <Text style={styles.spellSubtitle}>{northernNovemberSpell.subtitle}</Text>
+              <Text style={styles.spellDescription}>{northernNovemberSpell.description}</Text>
+
               <View style={styles.seasonalContextContainer}>
-                <Text style={styles.seasonalContextTitle}>Seasonal Context:</Text>
-                <Text style={styles.seasonalContextText}>{northernEclipseSpell.seasonalContext}</Text>
+                <Text style={styles.seasonalContextTitle}>Seasonal Context</Text>
+                <Text style={styles.seasonalContextText}>{northernNovemberSpell.seasonalContext}</Text>
               </View>
-              
+
               <View style={styles.spellDetails}>
                 <View style={styles.spellDetailItem}>
-                  <Text style={styles.spellDetailLabel}>Moon Phase:</Text>
-                  <Text style={styles.spellDetailValue}>{northernEclipseSpell.moonPhase}</Text>
+                  <Text style={styles.spellDetailLabel}>Moon Phase</Text>
+                  <Text style={styles.spellDetailValue}>{northernNovemberSpell.moonPhase}</Text>
                 </View>
                 <View style={styles.spellDetailItem}>
-                  <Text style={styles.spellDetailLabel}>Elements:</Text>
-                  <Text style={styles.spellDetailValue}>{northernEclipseSpell.element}</Text>
+                  <Text style={styles.spellDetailLabel}>Element</Text>
+                  <Text style={styles.spellDetailValue}>{northernNovemberSpell.element}</Text>
                 </View>
               </View>
-              
+
               <View style={styles.fullSpellContainer}>
-                <Text style={styles.fullSpellTitle}>The Ritual:</Text>
-                <Text style={styles.fullSpellText}>{northernEclipseSpell.fullSpell}</Text>
+                <Text style={styles.fullSpellTitle}>The Ritual</Text>
+                <Text style={styles.fullSpellText}>{northernNovemberSpell.fullSpell}</Text>
+              </View>
+            </LinearGradient>
+
+            {/* Northern New Moon */}
+            <LinearGradient
+              colors={['rgba(139, 157, 195, 0.15)', 'rgba(139, 157, 195, 0.05)']}
+              style={styles.spellCard}
+            >
+              <View style={styles.spellHeader}>
+                <Scroll size={20} color="#8b9dc3" />
+                <Text style={styles.spellTitle}>{northernNovemberNewMoon.title}</Text>
+              </View>
+              <Text style={styles.spellSubtitle}>{northernNovemberNewMoon.subtitle}</Text>
+              <Text style={styles.spellDescription}>{northernNovemberNewMoon.description}</Text>
+
+              <View style={styles.seasonalContextContainer}>
+                <Text style={styles.seasonalContextTitle}>Seasonal Context</Text>
+                <Text style={styles.seasonalContextText}>{northernNovemberNewMoon.seasonalContext}</Text>
+              </View>
+
+              <View style={styles.spellDetails}>
+                <View style={styles.spellDetailItem}>
+                  <Text style={styles.spellDetailLabel}>Moon Phase</Text>
+                  <Text style={styles.spellDetailValue}>{northernNovemberNewMoon.moonPhase}</Text>
+                </View>
+                <View style={styles.spellDetailItem}>
+                  <Text style={styles.spellDetailLabel}>Element</Text>
+                  <Text style={styles.spellDetailValue}>{northernNovemberNewMoon.element}</Text>
+                </View>
+              </View>
+
+              <View style={styles.fullSpellContainer}>
+                <Text style={styles.fullSpellTitle}>The Ritual</Text>
+                <Text style={styles.fullSpellText}>{northernNovemberNewMoon.fullSpell}</Text>
               </View>
             </LinearGradient>
           </View>
 
-          {/* Mystic Tips */}
+          {/* Tips */}
           <View style={styles.tipsSection}>
             <Text style={styles.sectionTitle}>Mish's Cosmic Tips</Text>
-            
             {tips.map((tip) => (
               <LinearGradient
                 key={tip.title}
@@ -505,7 +512,7 @@ Leave a candle burning in your window on Samhain night to guide helpful spirits 
             ))}
           </View>
 
-          {/* Mish's Wisdom */}
+          {/* Wisdom */}
           <LinearGradient
             colors={['rgba(212, 175, 55, 0.2)', 'rgba(139, 157, 195, 0.1)']}
             style={styles.wisdomCard}
@@ -515,12 +522,9 @@ Leave a candle burning in your window on Samhain night to guide helpful spirits 
               <Text style={styles.wisdomTitle}>Mish's Final Wisdom</Text>
             </View>
             <Text style={styles.wisdomText}>
-              "Remember, dear cosmic soul - magic isn't about the perfect ritual or the right tools. 
-              It's about your intention, your connection to the universe, and your willingness to believe 
-              in the unseen forces that guide us all. Trust your intuition, honor the moon cycles, 
-              and let your unique cosmic position be your greatest strength."
+              "Magic lives in your intention and the way you tend it. Trust your rhythm. Work with the moon. Let your path be simple and true."
             </Text>
-            <Text style={styles.wisdomSignature}>— Mystic Mish ✨</Text>
+            <Text style={styles.wisdomSignature}>- Mystic Mish ✨</Text>
           </LinearGradient>
         </ScrollView>
       </SafeAreaView>
@@ -529,22 +533,10 @@ Leave a candle burning in your window on Samhain night to guide helpful spirits 
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  headerCenter: {
-    alignItems: 'center',
-    paddingTop: 20,
-    paddingBottom: 24,
-  },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
+  headerCenter: { alignItems: 'center', paddingTop: 20, paddingBottom: 24 },
   title: {
     fontSize: 36,
     fontFamily: 'PlayfairDisplay-Bold',
@@ -568,12 +560,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  mishAvatarSimple: {
-    position: 'relative',
-    width: 80,
-    height: 95,
-    marginRight: 20,
-  },
   mishAvatarContainer: {
     position: 'relative',
     width: 80,
@@ -584,366 +570,112 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#d4af37',
   },
-  mishAvatar: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 18,
-  },
+  mishAvatar: { width: '100%', height: '100%', borderRadius: 18 },
   mishAvatarFallback: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: 80,
-    height: 95,
-    borderRadius: 18,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    width: 80, height: 95, borderRadius: 18,
     backgroundColor: 'rgba(139, 157, 195, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   mishPreviewContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#d4af37',
-    width: 100,
-    height: 120,
+    alignItems: 'center', marginBottom: 24, borderRadius: 20,
+    overflow: 'hidden', borderWidth: 2, borderColor: '#d4af37', width: 100, height: 120,
   },
-  mishPreviewImage: {
-    width: '100%',
-    height: '100%',
-  },
+  mishPreviewImage: { width: '100%', height: '100%' },
   mishPreviewFallback: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(139, 157, 195, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(139, 157, 195, 0.1)', alignItems: 'center', justifyContent: 'center',
   },
-  welcomeContent: {
-    flex: 1,
-  },
-  welcomeTitle: {
-    fontSize: 22,
-    fontFamily: 'PlayfairDisplay-Bold',
-    color: '#d4af37',
-    marginBottom: 8,
-  },
-  welcomeText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#e8e8e8',
-    lineHeight: 20,
-  },
+  welcomeContent: { flex: 1 },
+  welcomeTitle: { fontSize: 22, fontFamily: 'PlayfairDisplay-Bold', color: '#d4af37', marginBottom: 8 },
+  welcomeText: { fontSize: 16, fontFamily: 'Inter-Regular', color: '#e8e8e8', lineHeight: 20 },
+
   moonMessageCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: '#FFD700',
+    borderRadius: 16, padding: 20, marginBottom: 24, borderWidth: 2, borderColor: '#FFD700',
   },
-  moonHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  moonTitle: {
-    fontSize: 20,
-    fontFamily: 'PlayfairDisplay-Bold',
-    color: '#d4af37',
-    marginLeft: 8,
-  },
+  moonHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  moonTitle: { fontSize: 20, fontFamily: 'PlayfairDisplay-Bold', color: '#d4af37', marginLeft: 8 },
   moonPhaseText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#FFD700',
-    textAlign: 'center',
-    marginBottom: 12,
+    fontSize: 16, fontFamily: 'Inter-Regular', color: '#FFD700', textAlign: 'center', marginBottom: 12,
   },
   moonMessage: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#FFD700',
-    textAlign: 'center',
-    marginBottom: 8,
+    fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#FFD700', textAlign: 'center', marginBottom: 8,
   },
   moonDescription: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#ffffff',
-    textAlign: 'center',
-    lineHeight: 20,
+    fontSize: 16, fontFamily: 'Inter-Regular', color: '#ffffff', textAlign: 'center', lineHeight: 20,
   },
-  spellsSection: {
-    marginBottom: 32,
-  },
+
+  spellsSection: { marginBottom: 32 },
   sectionTitle: {
-    fontSize: 28,
-    fontFamily: 'PlayfairDisplay-Bold',
-    color: '#e8e8e8',
-    textAlign: 'center',
-    marginBottom: 20,
+    fontSize: 28, fontFamily: 'PlayfairDisplay-Bold', color: '#e8e8e8', textAlign: 'center', marginBottom: 20,
   },
   spellCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(212, 175, 55, 0.3)',
+    borderRadius: 16, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.3)',
   },
-  spellHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  spellTitle: {
-    fontSize: 20,
-    fontFamily: 'PlayfairDisplay-Bold',
-    color: '#e8e8e8',
-    marginLeft: 8,
-  },
-  spellSubtitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-Medium',
-    color: '#d4af37',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  spellDescription: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#e8e8e8',
-    lineHeight: 20,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  spellDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
-  spellDetailItem: {
-    alignItems: 'center',
-  },
+  spellHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  spellTitle: { fontSize: 20, fontFamily: 'PlayfairDisplay-Bold', color: '#e8e8e8', marginLeft: 8 },
+  spellSubtitle: { fontSize: 16, fontFamily: 'Inter-Medium', color: '#d4af37', marginBottom: 8, textAlign: 'center' },
+  spellDescription: { fontSize: 16, fontFamily: 'Inter-Regular', color: '#e8e8e8', lineHeight: 20, marginBottom: 16, textAlign: 'center' },
+
+  spellDetails: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, paddingHorizontal: 20 },
+  spellDetailItem: { alignItems: 'center' },
   spellDetailLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#8b9dc3',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontSize: 14, fontFamily: 'Inter-Medium', color: '#8b9dc3', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1,
   },
-  spellDetailValue: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#d4af37',
-  },
+  spellDetailValue: { fontSize: 16, fontFamily: 'Inter-SemiBold', color: '#d4af37' },
+
   fullSpellContainer: {
-    backgroundColor: 'rgba(26, 26, 46, 0.4)',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 157, 195, 0.2)',
+    backgroundColor: 'rgba(26, 26, 46, 0.4)', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: 'rgba(139, 157, 195, 0.2)',
   },
-  fullSpellTitle: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#d4af37',
-    marginBottom: 8,
-  },
-  fullSpellText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#e8e8e8',
-    lineHeight: 20,
-    fontStyle: 'italic',
-  },
+  fullSpellTitle: { fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#d4af37', marginBottom: 8 },
+  fullSpellText: { fontSize: 16, fontFamily: 'Inter-Regular', color: '#e8e8e8', lineHeight: 20, fontStyle: 'italic' },
+
   seasonalContextContainer: {
-    backgroundColor: 'rgba(26, 26, 46, 0.4)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 157, 195, 0.2)',
+    backgroundColor: 'rgba(26, 26, 46, 0.4)', borderRadius: 8, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(139, 157, 195, 0.2)',
   },
-  seasonalContextTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#8b9dc3',
-    marginBottom: 4,
-  },
-  seasonalContextText: {
-    fontSize: 15,
-    fontFamily: 'Inter-Regular',
-    color: '#e8e8e8',
-    lineHeight: 18,
-    fontStyle: 'italic',
-  },
-  tipsSection: {
-    marginBottom: 32,
-  },
+  seasonalContextTitle: { fontSize: 16, fontFamily: 'Inter-SemiBold', color: '#8b9dc3', marginBottom: 4 },
+  seasonalContextText: { fontSize: 15, fontFamily: 'Inter-Regular', color: '#e8e8e8', lineHeight: 18, fontStyle: 'italic' },
+
+  tipsSection: { marginBottom: 32 },
   tipCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 157, 195, 0.3)',
+    borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(139, 157, 195, 0.3)',
   },
-  tipHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  tipTitle: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#e8e8e8',
-    marginLeft: 8,
-  },
-  tipText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#e8e8e8',
-    lineHeight: 20,
-  },
-  wisdomCard: {
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(212, 175, 55, 0.4)',
-  },
-  wisdomHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  wisdomTitle: {
-    fontSize: 22,
-    fontFamily: 'PlayfairDisplay-Bold',
-    color: '#d4af37',
-    marginLeft: 8,
-  },
+  tipHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  tipTitle: { fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#e8e8e8', marginLeft: 8 },
+  tipText: { fontSize: 16, fontFamily: 'Inter-Regular', color: '#e8e8e8', lineHeight: 20 },
+
+  wisdomCard: { borderRadius: 16, padding: 24, borderWidth: 2, borderColor: 'rgba(212, 175, 55, 0.4)' },
+  wisdomHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  wisdomTitle: { fontSize: 22, fontFamily: 'PlayfairDisplay-Bold', color: '#d4af37', marginLeft: 8 },
   wisdomText: {
-    fontSize: 18,
-    fontFamily: 'Inter-Regular',
-    color: '#e8e8e8',
-    lineHeight: 24,
-    textAlign: 'center',
-    fontStyle: 'italic',
-    marginBottom: 12,
+    fontSize: 18, fontFamily: 'Inter-Regular', color: '#e8e8e8', lineHeight: 24, textAlign: 'center', fontStyle: 'italic', marginBottom: 12,
   },
-  wisdomSignature: {
-    fontSize: 16,
-    fontFamily: 'PlayfairDisplay-Bold',
-    color: '#d4af37',
-    textAlign: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 18,
-    fontFamily: 'Inter-Regular',
-    color: '#8b9dc3',
-    marginTop: 12,
-  },
+  wisdomSignature: { fontSize: 16, fontFamily: 'PlayfairDisplay-Bold', color: '#d4af37', textAlign: 'center' },
+
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontSize: 18, fontFamily: 'Inter-Regular', color: '#8b9dc3', marginTop: 12 },
+
   paywallCard: {
-    borderRadius: 16,
-    padding: 24,
-    marginTop: 40,
-    borderWidth: 1,
-    borderColor: 'rgba(212, 175, 55, 0.3)',
-    alignItems: 'center',
+    borderRadius: 16, padding: 24, marginTop: 40, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.3)', alignItems: 'center',
   },
-  paywallHeader: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
+  paywallHeader: { alignItems: 'center', marginBottom: 24 },
   paywallTitle: {
-    fontSize: 32,
-    fontFamily: 'PlayfairDisplay-Bold',
-    color: '#d4af37',
-    marginTop: 12,
-    textAlign: 'center',
-    marginBottom: 16,
+    fontSize: 32, fontFamily: 'PlayfairDisplay-Bold', color: '#d4af37', marginTop: 12, textAlign: 'center', marginBottom: 16,
     ...Platform.select({
-      web: {
-        textShadow: '1px 1px 2px #4B0082',
-      },
-      default: {
-        textShadowColor: '#4B0082',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
-      },
+      web: { textShadow: '1px 1px 2px #4B0082' },
+      default: { textShadowColor: '#4B0082', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 2 },
     }),
   },
-  mishPreviewSimple: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  mishEmojiLarge: {
-    fontSize: 60,
-    marginBottom: 8,
-  },
-  mishNameLarge: {
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-    color: '#FFD700',
-    textAlign: 'center',
-  },
+  mishEmojiLarge: { fontSize: 60, marginBottom: 8 },
+  mishNameLarge: { fontSize: 14, fontFamily: 'Inter-SemiBold', color: '#FFD700', textAlign: 'center' },
   paywallDescription: {
-    fontSize: 20,
-    fontFamily: 'Vazirmatn-Regular',
-    color: '#e8e8e8',
-    textAlign: 'center',
-    lineHeight: 26,
-    marginBottom: 24,
+    fontSize: 20, fontFamily: 'Vazirmatn-Regular', color: '#e8e8e8', textAlign: 'center', lineHeight: 26, marginBottom: 24,
   },
-  featuresList: {
-    gap: 12,
-    marginBottom: 32,
-    width: '100%',
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  featureText: {
-    fontSize: 18,
-    fontFamily: 'Vazirmatn-Medium',
-    color: '#e8e8e8',
-    marginLeft: 12,
-  },
-  upgradeButton: {
-    minWidth: 200,
-  },
-  headerIcon: {
-    fontSize: 48,
-    marginBottom: 6,
-    color: '#d4af37',
-  },
-  headerTitle: {
-    fontSize: 26,
-    color: '#e8e8e8',
-    fontFamily: 'Vazirmatn-Bold',
-    textAlign: 'center',
-  },
-  headerSubtitle: {
-    marginTop: 4,
-    color: '#8b9dc3',
-    fontSize: 16,
-    fontFamily: 'Vazirmatn-Regular',
-    textAlign: 'center',
-  },
+  featuresList: { gap: 12, marginBottom: 32, width: '100%' },
+  featureItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  featureText: { fontSize: 18, fontFamily: 'Vazirmatn-Medium', color: '#e8e8e8', marginLeft: 12 },
+  upgradeButton: { minWidth: 200 },
+  headerIcon: { fontSize: 48, marginBottom: 6, color: '#d4af37' },
+  headerTitle: { fontSize: 26, color: '#e8e8e8', fontFamily: 'Vazirmatn-Bold', textAlign: 'center' },
+  headerSubtitle: { marginTop: 4, color: '#8b9dc3', fontSize: 16, fontFamily: 'Vazirmatn-Regular', textAlign: 'center' },
 });
