@@ -5,15 +5,12 @@
 
 [build.environment]
   NODE_VERSION = "20.19.0"
-  # Set EXPO_PUBLIC_* secrets in Netlify UI, not here, to keep them safe.
 
-# SPA routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Cache hashed assets
 [[headers]]
   for = "/assets/*"
   [headers.values]
