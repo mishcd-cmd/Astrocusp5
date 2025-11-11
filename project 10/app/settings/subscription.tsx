@@ -1,4 +1,4 @@
-// app/subscription.tsx
+// project 10/app/subscription.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -16,13 +16,13 @@ import { Crown, CreditCard, Eye, ArrowLeft, Star, Calendar, Zap } from 'lucide-r
 
 import CosmicBackground from '@/components/CosmicBackground';
 import {
-  openStripePortal,
   subscribeMonthly,
   subscribeYearly,
   upgradeToYearly,
   buyOneOffReading,
   getSubscriptionStatus,
 } from '@/utils/billing';
+import { openBillingPortal } from '@/utils/openBillingPortal';
 
 type SubStatus = {
   active: boolean;
@@ -64,7 +64,7 @@ export default function SubscriptionScreen() {
   const onOpenPortal = async () => {
     try {
       setActionLoading('portal');
-      await openStripePortal();
+      await openBillingPortal(); // shared helper: same tab on web, system browser on iOS
     } catch (e: any) {
       console.error('[subscription] portal error', e);
       Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');
@@ -91,19 +91,16 @@ export default function SubscriptionScreen() {
     try {
       console.log('[settings/subscription] Monthly button clicked - starting process...');
       setActionLoading('monthly');
-      
-      // Check authentication
+
       const { getCurrentUser } = await import('@/utils/auth');
       const authUser = await getCurrentUser();
-      
       if (!authUser) {
         console.error('[settings/subscription] No authenticated user found');
         Alert.alert('Authentication Required', 'Please sign in to subscribe.');
         setActionLoading(null);
         return;
       }
-      
-      // Check Stripe configuration
+
       const { isStripeConfigured } = await import('@/utils/stripe');
       if (!isStripeConfigured()) {
         console.error('[settings/subscription] Stripe not configured');
@@ -111,7 +108,7 @@ export default function SubscriptionScreen() {
         setActionLoading(null);
         return;
       }
-      
+
       await subscribeMonthly();
     } catch (e: any) {
       console.error('[subscription] monthly error', e);
@@ -125,19 +122,16 @@ export default function SubscriptionScreen() {
     try {
       console.log('[settings/subscription] Yearly button clicked - starting process...');
       setActionLoading('yearly');
-      
-      // Check authentication
+
       const { getCurrentUser } = await import('@/utils/auth');
       const authUser = await getCurrentUser();
-      
       if (!authUser) {
         console.error('[settings/subscription] No authenticated user found');
         Alert.alert('Authentication Required', 'Please sign in to subscribe.');
         setActionLoading(null);
         return;
       }
-      
-      // Check Stripe configuration
+
       const { isStripeConfigured } = await import('@/utils/stripe');
       if (!isStripeConfigured()) {
         console.error('[settings/subscription] Stripe not configured');
@@ -145,7 +139,7 @@ export default function SubscriptionScreen() {
         setActionLoading(null);
         return;
       }
-      
+
       await subscribeYearly();
     } catch (e: any) {
       console.error('[subscription] yearly error', e);
@@ -159,19 +153,16 @@ export default function SubscriptionScreen() {
     try {
       console.log('[settings/subscription] One-off button clicked - starting process...');
       setActionLoading('one-off');
-      
-      // Check authentication
+
       const { getCurrentUser } = await import('@/utils/auth');
       const authUser = await getCurrentUser();
-      
       if (!authUser) {
         console.error('[settings/subscription] No authenticated user found');
         Alert.alert('Authentication Required', 'Please sign in to purchase.');
         setActionLoading(null);
         return;
       }
-      
-      // Check Stripe configuration
+
       const { isStripeConfigured } = await import('@/utils/stripe');
       if (!isStripeConfigured()) {
         console.error('[settings/subscription] Stripe not configured');
@@ -179,7 +170,7 @@ export default function SubscriptionScreen() {
         setActionLoading(null);
         return;
       }
-      
+
       await buyOneOffReading();
     } catch (e: any) {
       console.error('[subscription] one-off error', e);

@@ -64,7 +64,8 @@ export default function SubscriptionScreen() {
   const onOpenPortal = async () => {
     try {
       setActionLoading('portal');
-      await openBillingPortal(); // same-tab navigation for WKWebView
+      console.log('[subscription] opening portal from', typeof window !== 'undefined' ? window.location.pathname : '(native)');
+      await openBillingPortal(); // same-tab navigation or Capacitor Browser on iOS
     } catch (e: any) {
       console.error('[subscription] portal error', e);
       Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');
@@ -89,7 +90,7 @@ export default function SubscriptionScreen() {
 
   const onSubscribeMonthly = async () => {
     try {
-      console.log('[settings/subscription] Monthly button clicked - starting process...');
+      console.log('[settings/subscription] Monthly clicked - starting process...');
       setActionLoading('monthly');
 
       const { getCurrentUser } = await import('@/utils/auth');
@@ -120,7 +121,7 @@ export default function SubscriptionScreen() {
 
   const onSubscribeYearly = async () => {
     try {
-      console.log('[settings/subscription] Yearly button clicked - starting process...');
+      console.log('[settings/subscription] Yearly clicked - starting process...');
       setActionLoading('yearly');
 
       const { getCurrentUser } = await import('@/utils/auth');
@@ -151,7 +152,7 @@ export default function SubscriptionScreen() {
 
   const onBuyOneOff = async () => {
     try {
-      console.log('[settings/subscription] One-off button clicked - starting process...');
+      console.log('[settings/subscription] One-off clicked - starting process...');
       setActionLoading('one-off');
 
       const { getCurrentUser } = await import('@/utils/auth');
@@ -220,7 +221,7 @@ export default function SubscriptionScreen() {
               }
               style={styles.statusCard}
             >
-              <View className="statusHeader" style={styles.statusHeader}>
+              <View style={styles.statusHeader}>
                 <Crown size={24} color={isActive ? '#8bc34a' : '#8b9dc3'} />
                 <Text style={styles.statusTitle}>Current Status</Text>
               </View>
@@ -278,7 +279,11 @@ export default function SubscriptionScreen() {
 
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
-                    style={[styles.actionButton, styles.portalButton]}
+                    style={[
+                      styles.actionButton,
+                      styles.portalButton,
+                      actionLoading === 'portal' && { opacity: 0.6 },
+                    ]}
                     onPress={onOpenPortal}
                     disabled={actionLoading === 'portal'}
                   >
