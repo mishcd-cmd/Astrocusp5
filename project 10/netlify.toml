@@ -6,6 +6,16 @@
 [build.environment]
   NODE_VERSION = "20.19.0"
 
+# 301 redirect: send all non-www traffic to the www domain
+# This runs only when the request host equals astrocusp.com.au
+[[redirects]]
+  from = "/*"
+  to = "https://www.astrocusp.com.au/:splat"
+  status = 301
+  force = true
+  conditions = { Host = ["astrocusp.com.au"] }
+
+# Keep the SPA fallback LAST so your app routes still work
 [[redirects]]
   from = "/*"
   to = "/index.html"
