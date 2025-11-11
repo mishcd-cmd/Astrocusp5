@@ -7,13 +7,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 // Normalize and lock your site URL
 function normalizeSiteUrl(raw?: string): string {
-  // use your canonical host with www to match Netlify redirects
   let base = (raw && raw.trim()) || "https://www.astrocusp.com.au"
-  // enforce https
   base = base.replace(/^http:\/\//i, "https://")
-  // do not strip www, it is your canonical host
-  // base = base.replace(/^https:\/\/www\./i, "https://")
-  // strip trailing slash
   base = base.replace(/\/+$/, "")
   return base
 }
@@ -23,8 +18,7 @@ function sameOriginOrNull(url: string | undefined, site: string): string | null 
   try {
     const u = new URL(url)
     const s = new URL(site)
-    if (u.origin === s.origin) return u.toString()
-    return null
+    return u.origin === s.origin ? u.toString() : null
   } catch {
     return null
   }
@@ -47,18 +41,22 @@ export const handler = async (event: any) => {
   }
 
   try {
-    const { priceId, mode = "subscription", successUrl, cancelUrl, email } = JSON.parse(event.body)
+    const parsed = JSON.parse(event.body || "{}")
+    const { priceId, mode = "subscription", successUrl, cancelUrl, email, returnPath } = parsed
 
     if (!priceId) {
       return { statusCode: 400, body: JSON.stringify({ error: "Price ID is required" }) }
     }
 
     const SITE = normalizeSiteUrl(process.env.SITE_URL)
-    const DEFAULT_SUCCESS = `${SITE}/settings?status=success`
-    const DEFAULT_CANCEL = `${SITE}/settings?status=cancel`
+    const encodedReturn = returnPath ? `&return=${encodeURIComponent(returnPath)}` : ""
+
+    // Defaults carry the return path so we can jump back to the originating screen
+    const DEFAULT_SUCCESS = `${SITE}/settings?status=success${encodedReturn}`
+    const DEFAULT_CANCEL  = `${SITE}/settings?status=cancel${encodedReturn}`
 
     const SAFE_SUCCESS = sameOriginOrNull(successUrl, SITE) ?? DEFAULT_SUCCESS
-    const SAFE_CANCEL = sameOriginOrNull(cancelUrl, SITE) ?? DEFAULT_CANCEL
+    const SAFE_CANCEL  = sameOriginOrNull(cancelUrl,  SITE) ?? DEFAULT_CANCEL
 
     const session = await stripe.checkout.sessions.create({
       mode,
