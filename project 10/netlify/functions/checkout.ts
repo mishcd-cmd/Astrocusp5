@@ -1,3 +1,4 @@
+// netlify/functions/checkout.ts
 import Stripe from "stripe"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -6,9 +7,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 // Normalize and lock your site URL
 function normalizeSiteUrl(raw?: string): string {
-  let base = (raw && raw.trim()) || "https://astrocusp.com.au"
+  // use your canonical host with www to match Netlify redirects
+  let base = (raw && raw.trim()) || "https://www.astrocusp.com.au"
+  // enforce https
   base = base.replace(/^http:\/\//i, "https://")
-  base = base.replace(/^https:\/\/www\./i, "https://")
+  // do not strip www, it is your canonical host
+  // base = base.replace(/^https:\/\/www\./i, "https://")
+  // strip trailing slash
   base = base.replace(/\/+$/, "")
   return base
 }

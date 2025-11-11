@@ -1,5 +1,4 @@
 [build]
-  base = "project 10"
   command = "npm ci && npm run build"
   publish = "dist"
   functions = "netlify/functions"
