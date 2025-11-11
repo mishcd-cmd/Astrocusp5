@@ -1,3 +1,4 @@
+// project 10/app/subscription.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -15,13 +16,13 @@ import { Crown, CreditCard, Eye, ArrowLeft, Star, Calendar, Zap } from 'lucide-r
 
 import CosmicBackground from '@/components/CosmicBackground';
 import {
-  openStripePortal,
   subscribeMonthly,
   subscribeYearly,
   upgradeToYearly,
   buyOneOffReading,
   getSubscriptionStatus,
 } from '@/utils/billing';
+import { openBillingPortal } from '@/utils/openBillingPortal';
 
 type SubStatus = {
   active: boolean;
@@ -56,31 +57,14 @@ export default function SubscriptionScreen() {
   }, [refreshStatus]);
 
   const handleGoBack = () => {
-    try {
-      console.log('[subscription] Back button clicked');
-      
-      if (router.canGoBack()) {
-        console.log('[subscription] Using router.back()');
-        router.back();
-      } else {
-        console.log('[subscription] Using router.replace() to settings');
-        router.replace('/(tabs)/settings');
-      }
-    } catch (error: any) {
-      console.error('[subscription] Back button error:', error);
-      // Fallback navigation
-      try {
-        router.replace('/(tabs)/settings');
-      } catch (fallbackError) {
-        console.error('[subscription] Fallback navigation failed:', fallbackError);
-      }
-    }
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/settings');
   };
 
   const onOpenPortal = async () => {
     try {
       setActionLoading('portal');
-      await openStripePortal();
+      await openBillingPortal(); // same-tab navigation for WKWebView
     } catch (e: any) {
       console.error('[subscription] portal error', e);
       Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');
@@ -105,35 +89,30 @@ export default function SubscriptionScreen() {
 
   const onSubscribeMonthly = async () => {
     try {
-      console.log('[subscription] Monthly button clicked - starting process...');
-      
-      // Show loading state immediately
+      console.log('[settings/subscription] Monthly button clicked - starting process...');
       setActionLoading('monthly');
-      
-      // Add small delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      console.log('[subscription] Starting monthly subscription...');
-      
+
+      const { getCurrentUser } = await import('@/utils/auth');
+      const authUser = await getCurrentUser();
+      if (!authUser) {
+        console.error('[settings/subscription] No authenticated user found');
+        Alert.alert('Authentication Required', 'Please sign in to subscribe.');
+        setActionLoading(null);
+        return;
+      }
+
+      const { isStripeConfigured } = await import('@/utils/stripe');
+      if (!isStripeConfigured()) {
+        console.error('[settings/subscription] Stripe not configured');
+        Alert.alert('Configuration Error', 'Payment system not configured. Please contact support.');
+        setActionLoading(null);
+        return;
+      }
+
       await subscribeMonthly();
-      
     } catch (e: any) {
       console.error('[subscription] monthly error', e);
-      
-      // More specific error messages
-      let errorMessage = 'Unable to start subscription. ';
-      
-      if (e?.message?.includes('network') || e?.message?.includes('fetch')) {
-        errorMessage += 'Please check your internet connection and try again.';
-      } else if (e?.message?.includes('authentication') || e?.message?.includes('auth')) {
-        errorMessage += 'Please sign in and try again.';
-      } else if (e?.message?.includes('stripe') || e?.message?.includes('payment')) {
-        errorMessage += 'Payment system error. Please try again in a moment.';
-      } else {
-        errorMessage += e?.message || 'Please try again.';
-      }
-      
-      Alert.alert('Subscription Failed', errorMessage);
+      Alert.alert('Subscription Failed', e?.message || 'Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -141,16 +120,30 @@ export default function SubscriptionScreen() {
 
   const onSubscribeYearly = async () => {
     try {
-      console.log('[subscription] Starting yearly subscription...');
+      console.log('[settings/subscription] Yearly button clicked - starting process...');
       setActionLoading('yearly');
-      
-      // Add delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
+
+      const { getCurrentUser } = await import('@/utils/auth');
+      const authUser = await getCurrentUser();
+      if (!authUser) {
+        console.error('[settings/subscription] No authenticated user found');
+        Alert.alert('Authentication Required', 'Please sign in to subscribe.');
+        setActionLoading(null);
+        return;
+      }
+
+      const { isStripeConfigured } = await import('@/utils/stripe');
+      if (!isStripeConfigured()) {
+        console.error('[settings/subscription] Stripe not configured');
+        Alert.alert('Configuration Error', 'Payment system not configured. Please contact support.');
+        setActionLoading(null);
+        return;
+      }
+
       await subscribeYearly();
     } catch (e: any) {
       console.error('[subscription] yearly error', e);
-      Alert.alert('Subscription Failed', e?.message || 'Unable to start subscription. Please check your connection and try again.');
+      Alert.alert('Subscription Failed', e?.message || 'Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -158,12 +151,26 @@ export default function SubscriptionScreen() {
 
   const onBuyOneOff = async () => {
     try {
-      console.log('[subscription] One-off button clicked - starting process...');
+      console.log('[settings/subscription] One-off button clicked - starting process...');
       setActionLoading('one-off');
-      
-      // Add delay to show loading state
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
+
+      const { getCurrentUser } = await import('@/utils/auth');
+      const authUser = await getCurrentUser();
+      if (!authUser) {
+        console.error('[settings/subscription] No authenticated user found');
+        Alert.alert('Authentication Required', 'Please sign in to purchase.');
+        setActionLoading(null);
+        return;
+      }
+
+      const { isStripeConfigured } = await import('@/utils/stripe');
+      if (!isStripeConfigured()) {
+        console.error('[settings/subscription] Stripe not configured');
+        Alert.alert('Configuration Error', 'Payment system not configured. Please contact support.');
+        setActionLoading(null);
+        return;
+      }
+
       await buyOneOffReading();
     } catch (e: any) {
       console.error('[subscription] one-off error', e);
@@ -190,7 +197,6 @@ export default function SubscriptionScreen() {
   const isActive = !!status?.active;
   const isMonthly = status?.plan === 'monthly';
   const isYearly = status?.plan === 'yearly';
-  const isVip = !!status?.isVip;
 
   return (
     <View style={styles.container}>
@@ -206,7 +212,6 @@ export default function SubscriptionScreen() {
             <Text style={styles.title}>Astral Plane</Text>
             <Text style={styles.subtitle}>Manage your cosmic subscription</Text>
 
-            {/* Current Subscription Status */}
             <LinearGradient
               colors={
                 isActive
@@ -215,7 +220,7 @@ export default function SubscriptionScreen() {
               }
               style={styles.statusCard}
             >
-              <View style={styles.statusHeader}>
+              <View className="statusHeader" style={styles.statusHeader}>
                 <Crown size={24} color={isActive ? '#8bc34a' : '#8b9dc3'} />
                 <Text style={styles.statusTitle}>Current Status</Text>
               </View>
@@ -223,13 +228,8 @@ export default function SubscriptionScreen() {
               {isActive ? (
                 <>
                   <Text style={styles.statusActive}>
-                    Active ({isVip ? 'VIP Access' : isYearly ? 'Yearly' : 'Monthly'} Plan)
+                    Active ({isYearly ? 'Yearly' : 'Monthly'} Plan)
                   </Text>
-                  {isVip && (
-                    <Text style={styles.vipBadge}>
-                      🌟 VIP Account - Complimentary Access
-                    </Text>
-                  )}
                   {status?.renewsAt && (
                     <Text style={styles.renewalDate}>
                       Renews:{' '}
@@ -266,8 +266,7 @@ export default function SubscriptionScreen() {
               )}
             </LinearGradient>
 
-            {/* Management (only if active and not VIP) */}
-            {isActive && !isVip && (
+            {isActive && (
               <LinearGradient
                 colors={['rgba(212, 175, 55, 0.15)', 'rgba(212, 175, 55, 0.05)']}
                 style={styles.managementCard}
@@ -309,24 +308,6 @@ export default function SubscriptionScreen() {
               </LinearGradient>
             )}
 
-            {/* VIP Message */}
-            {isVip && (
-              <LinearGradient
-                colors={['rgba(212, 175, 55, 0.25)', 'rgba(212, 175, 55, 0.15)']}
-                style={styles.vipCard}
-              >
-                <View style={styles.vipHeader}>
-                  <Crown size={24} color="#d4af37" />
-                  <Text style={styles.vipTitle}>VIP Account</Text>
-                </View>
-                <Text style={styles.vipDescription}>
-                  You have complimentary access to all Astral Plane features. 
-                  Thank you for being part of the Astro Cusp community! ✨
-                </Text>
-              </LinearGradient>
-            )}
-
-            {/* Plans (only if not active) */}
             {!isActive && (
               <View style={styles.subscriptionOptions}>
                 <Text style={styles.optionsTitle}>Choose Your Plan</Text>
@@ -344,12 +325,12 @@ export default function SubscriptionScreen() {
                     Full access to all premium features with monthly billing
                   </Text>
                   <TouchableOpacity
-                    style={[styles.actionButton, styles.subscribeButton, isVip && styles.disabledButton]}
+                    style={[styles.actionButton, styles.subscribeButton]}
                     onPress={onSubscribeMonthly}
-                    disabled={actionLoading !== null || isVip}
+                    disabled={actionLoading === 'monthly'}
                   >
-                    <Text style={[styles.subscribeButtonText, isVip && styles.disabledButtonText]}>
-                      {isVip ? 'VIP Access Active' : actionLoading === 'monthly' ? 'Processing…' : 'Start Monthly'}
+                    <Text style={styles.subscribeButtonText}>
+                      {actionLoading === 'monthly' ? 'Processing…' : 'Start Monthly'}
                     </Text>
                   </TouchableOpacity>
                 </LinearGradient>
@@ -371,19 +352,18 @@ export default function SubscriptionScreen() {
                     Full access to all premium features with yearly savings
                   </Text>
                   <TouchableOpacity
-                    style={[styles.actionButton, styles.subscribeButton, isVip && styles.disabledButton]}
+                    style={[styles.actionButton, styles.subscribeButton]}
                     onPress={onSubscribeYearly}
-                    disabled={actionLoading !== null || isVip}
+                    disabled={actionLoading === 'yearly'}
                   >
-                    <Text style={[styles.subscribeButtonText, isVip && styles.disabledButtonText]}>
-                      {isVip ? 'VIP Access Active' : actionLoading === 'yearly' ? 'Processing…' : 'Start Yearly'}
+                    <Text style={styles.subscribeButtonText}>
+                      {actionLoading === 'yearly' ? 'Processing…' : 'Start Yearly'}
                     </Text>
                   </TouchableOpacity>
                 </LinearGradient>
               </View>
             )}
 
-            {/* One-off Reading */}
             <LinearGradient
               colors={['rgba(139, 157, 195, 0.2)', 'rgba(139, 157, 195, 0.1)']}
               style={styles.oneOffCard}
@@ -401,22 +381,21 @@ export default function SubscriptionScreen() {
               </Text>
 
               <TouchableOpacity
-                style={[styles.actionButton, styles.oneOffButton, isVip && styles.disabledButton]}
+                style={[styles.actionButton, styles.oneOffButton]}
                 onPress={onBuyOneOff}
-                disabled={actionLoading !== null || isVip}
+                disabled={actionLoading === 'one-off'}
               >
                 <Eye size={16} color="#1a1a2e" />
-                <Text style={[styles.oneOffButtonText, isVip && styles.disabledButtonText]}>
-                  {isVip ? 'VIP Access Active' : actionLoading === 'one-off' ? 'Processing…' : 'Purchase Reading'}
+                <Text style={styles.oneOffButtonText}>
+                  {actionLoading === 'one-off' ? 'Processing…' : 'Purchase Reading'}
                 </Text>
               </TouchableOpacity>
 
               <Text style={styles.oneOffNote}>
-                {isVip ? 'You already have VIP access to all features' : 'Perfect for exploring cusp astrology without a subscription commitment'}
+                Perfect for exploring cusp astrology without a subscription commitment
               </Text>
             </LinearGradient>
 
-            {/* Action overlay */}
             {actionLoading && (
               <View style={styles.loadingOverlay}>
                 <ActivityIndicator size="large" color="#d4af37" />
@@ -461,16 +440,8 @@ const styles = StyleSheet.create({
   buttonRow: { flexDirection: 'row', gap: 12, marginBottom: 12, flexWrap: 'wrap' },
 
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    minHeight: 44,
-    gap: 8,
-    flex: 1,
-    minWidth: 120,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, minHeight: 44, gap: 8, flex: 1, minWidth: 120,
   },
   portalButton: { backgroundColor: 'rgba(139, 157, 195, 0.2)', borderWidth: 1, borderColor: 'rgba(139, 157, 195, 0.4)' },
   portalButtonText: { color: '#8b9dc3', fontFamily: 'Inter-Medium', fontSize: 14 },
@@ -519,44 +490,4 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(26, 26, 46, 0.8)', alignItems: 'center', justifyContent: 'center', borderRadius: 16,
   },
   loadingActionText: { fontSize: 16, fontFamily: 'Inter-Regular', color: '#8b9dc3', marginTop: 12 },
-  vipBadge: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#d4af37',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  vipCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(212, 175, 55, 0.5)',
-  },
-  vipHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  vipTitle: {
-    fontSize: 20,
-    fontFamily: 'PlayfairDisplay-Bold',
-    color: '#d4af37',
-    marginLeft: 8,
-  },
-  vipDescription: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#e8e8e8',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  disabledButton: {
-    opacity: 0.5,
-    backgroundColor: '#4a4a4a',
-  },
-  disabledButtonText: {
-    color: '#888888',
-  },
 });
