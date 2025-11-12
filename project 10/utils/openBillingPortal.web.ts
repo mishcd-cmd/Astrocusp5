@@ -1,41 +1,47 @@
-import { supabase } from './supabase'
+// utils/openBillingPortal.web.ts
+import { supabase } from '@/utils/supabase';
 
-export async function openBillingPortal() {
-  console.log('[openBillingPortal.web] start')
+const FUNCTION_URL =
+  'https://fulzqbwojvrripsuoreh.supabase.co/functions/v1/stripe-portal';
 
-  const { data } = await supabase.auth.getSession()
-  const session = data?.session
-  if (!session) throw new Error('You need to be signed in to manage billing.')
+export async function openBillingPortal(): Promise<void> {
+  console.log('[openBillingPortal.web] start');
 
-  const jwt = session.access_token
-  const base = process.env.EXPO_PUBLIC_SUPABASE_URL // like https://xxxx.supabase.co
-  if (!base) throw new Error('Supabase URL is not configured')
-
-  const url = `${base}/functions/v1/stripe-portal`
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${jwt}`,
-    },
-    credentials: 'omit', // avoid cookie mode to keep CORS simple
-    body: JSON.stringify({}),
-  })
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '')
-    console.log('[openBillingPortal.web] error response', res.status, txt)
-    try {
-      const j = JSON.parse(txt)
-      throw new Error(j.error || 'Server error')
-    } catch {
-      throw new Error(txt || 'Server error')
-    }
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+  if (sessionError) {
+    console.error('[openBillingPortal.web] getSession error', sessionError);
+    throw new Error('Not authenticated');
+  }
+  const token = sessionData?.session?.access_token;
+  if (!token) {
+    console.error('[openBillingPortal.web] No JWT token');
+    throw new Error('Not authenticated');
   }
 
-  const { url: portalUrl } = await res.json()
-  if (!portalUrl) throw new Error('No portal URL returned')
+  // Important on web: no cookies
+  const res = await fetch(FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    credentials: 'omit',
+    body: JSON.stringify({}),
+  });
 
-  window.location.assign(portalUrl)
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    console.error('[openBillingPortal.web] error response', res.status, txt);
+    throw new Error(txt || 'Server misconfiguration');
+  }
+
+  const json: { url?: string } = await res.json().catch(() => ({}));
+  if (!json.url) {
+    console.error('[openBillingPortal.web] Missing portal URL in response', json);
+    throw new Error('No portal URL received');
+  }
+
+  // Navigate current tab to the portal
+  window.location.href = json.url;
 }

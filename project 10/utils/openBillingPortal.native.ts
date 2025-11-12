@@ -1,39 +1,47 @@
-import { supabase } from './supabase'
-import { Linking } from 'react-native'
+// utils/openBillingPortal.native.ts
+import { Linking } from 'react-native';
+import { supabase } from '@/utils/supabase';
 
-export async function openBillingPortal() {
-  const { data } = await supabase.auth.getSession()
-  const session = data?.session
-  if (!session) throw new Error('You need to be signed in to manage billing.')
+const FUNCTION_URL =
+  'https://fulzqbwojvrripsuoreh.supabase.co/functions/v1/stripe-portal';
 
-  const jwt = session.access_token
-  const base = process.env.EXPO_PUBLIC_SUPABASE_URL
-  if (!base) throw new Error('Supabase URL is not configured')
+export async function openBillingPortal(): Promise<void> {
+  console.log('[openBillingPortal.native] start');
 
-  const url = `${base}/functions/v1/stripe-portal`
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${jwt}`,
-    },
-    // native is not subject to browser CORS, no credentials needed
-    body: JSON.stringify({}),
-  })
-
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '')
-    try {
-      const j = JSON.parse(txt)
-      throw new Error(j.error || 'Server error')
-    } catch {
-      throw new Error(txt || 'Server error')
-    }
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+  if (sessionError) {
+    console.error('[openBillingPortal.native] getSession error', sessionError);
+    throw new Error('Not authenticated');
+  }
+  const token = sessionData?.session?.access_token;
+  if (!token) {
+    console.error('[openBillingPortal.native] No JWT token');
+    throw new Error('Not authenticated');
   }
 
-  const { url: portalUrl } = await res.json()
-  if (!portalUrl) throw new Error('No portal URL returned')
+  const res = await fetch(FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    // RN fetch has no cookies by default, so we are fine
+    body: JSON.stringify({}),
+  });
 
-  await Linking.openURL(portalUrl)
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    console.error('[openBillingPortal.native] error response', res.status, txt);
+    throw new Error(txt || 'Server misconfiguration');
+  }
+
+  const json: { url?: string } = await res.json().catch(() => ({}));
+  if (!json.url) {
+    console.error('[openBillingPortal.native] Missing portal URL in response', json);
+    throw new Error('No portal URL received');
+  }
+
+  // Open in system browser
+  await Linking.openURL(json.url);
 }
