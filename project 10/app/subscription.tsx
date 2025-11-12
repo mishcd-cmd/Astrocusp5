@@ -28,7 +28,7 @@ type SubStatus = {
   active: boolean;
   plan?: 'monthly' | 'yearly';
   renewsAt?: string;
-  customerId?: string;
+  customerId?: string; // important
   price_id?: string;
   status?: string;
 } | null;
@@ -62,14 +62,14 @@ export default function SubscriptionScreen() {
   };
 
   const onOpenPortal = async () => {
-    if (actionLoading) return; // prevent double tap
     try {
       setActionLoading('portal');
-      console.log(
-        '[subscription] opening portal from',
-        typeof window !== 'undefined' ? window.location.pathname : '(native)'
-      );
-      await openBillingPortal(); // same-tab on web, Capacitor Browser on iOS
+      const customerId = status?.customerId;
+      if (!customerId) {
+        // last resort: refresh once to try to obtain it
+        await refreshStatus();
+      }
+      await openBillingPortal(customerId || status?.customerId || undefined);
     } catch (e: any) {
       console.error('[subscription] portal error', e);
       Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');
@@ -79,7 +79,6 @@ export default function SubscriptionScreen() {
   };
 
   const onUpgrade = async () => {
-    if (actionLoading) return;
     try {
       setActionLoading('upgrade');
       const res = await upgradeToYearly();
@@ -94,28 +93,21 @@ export default function SubscriptionScreen() {
   };
 
   const onSubscribeMonthly = async () => {
-    if (actionLoading) return;
     try {
-      console.log('[settings/subscription] Monthly clicked - starting process...');
       setActionLoading('monthly');
-
       const { getCurrentUser } = await import('@/utils/auth');
       const authUser = await getCurrentUser();
       if (!authUser) {
-        console.error('[settings/subscription] No authenticated user found');
         Alert.alert('Authentication Required', 'Please sign in to subscribe.');
         setActionLoading(null);
         return;
       }
-
       const { isStripeConfigured } = await import('@/utils/stripe');
       if (!isStripeConfigured()) {
-        console.error('[settings/subscription] Stripe not configured');
         Alert.alert('Configuration Error', 'Payment system not configured. Please contact support.');
         setActionLoading(null);
         return;
       }
-
       await subscribeMonthly();
     } catch (e: any) {
       console.error('[subscription] monthly error', e);
@@ -126,28 +118,21 @@ export default function SubscriptionScreen() {
   };
 
   const onSubscribeYearly = async () => {
-    if (actionLoading) return;
     try {
-      console.log('[settings/subscription] Yearly clicked - starting process...');
       setActionLoading('yearly');
-
       const { getCurrentUser } = await import('@/utils/auth');
       const authUser = await getCurrentUser();
       if (!authUser) {
-        console.error('[settings/subscription] No authenticated user found');
         Alert.alert('Authentication Required', 'Please sign in to subscribe.');
         setActionLoading(null);
         return;
       }
-
       const { isStripeConfigured } = await import('@/utils/stripe');
       if (!isStripeConfigured()) {
-        console.error('[settings/subscription] Stripe not configured');
         Alert.alert('Configuration Error', 'Payment system not configured. Please contact support.');
         setActionLoading(null);
         return;
       }
-
       await subscribeYearly();
     } catch (e: any) {
       console.error('[subscription] yearly error', e);
@@ -158,28 +143,21 @@ export default function SubscriptionScreen() {
   };
 
   const onBuyOneOff = async () => {
-    if (actionLoading) return;
     try {
-      console.log('[settings/subscription] One-off clicked - starting process...');
       setActionLoading('one-off');
-
       const { getCurrentUser } = await import('@/utils/auth');
       const authUser = await getCurrentUser();
       if (!authUser) {
-        console.error('[settings/subscription] No authenticated user found');
         Alert.alert('Authentication Required', 'Please sign in to purchase.');
         setActionLoading(null);
         return;
       }
-
       const { isStripeConfigured } = await import('@/utils/stripe');
       if (!isStripeConfigured()) {
-        console.error('[settings/subscription] Stripe not configured');
         Alert.alert('Configuration Error', 'Payment system not configured. Please contact support.');
         setActionLoading(null);
         return;
       }
-
       await buyOneOffReading();
     } catch (e: any) {
       console.error('[subscription] one-off error', e);
@@ -287,11 +265,7 @@ export default function SubscriptionScreen() {
 
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
-                    style={[
-                      styles.actionButton,
-                      styles.portalButton,
-                      actionLoading === 'portal' && { opacity: 0.6 },
-                    ]}
+                    style={[styles.actionButton, styles.portalButton]}
                     onPress={onOpenPortal}
                     disabled={actionLoading === 'portal'}
                   >
@@ -333,7 +307,7 @@ export default function SubscriptionScreen() {
                     <Crown size={20} color="#d4af37" />
                     <Text style={styles.planName}>Monthly Plan</Text>
                   </View>
-                  <Text style={styles.planPrice}>$8.00 AUD per month</Text>
+                  <Text style={styles.planPrice}>$8.00 AUD / month</Text>
                   <Text style={styles.planDescription}>
                     Full access to all premium features with monthly billing
                   </Text>
@@ -359,7 +333,7 @@ export default function SubscriptionScreen() {
                       <Text style={styles.savingsText}>Save up to 10%</Text>
                     </View>
                   </View>
-                  <Text style={styles.planPrice}>$88.00 AUD per year</Text>
+                  <Text style={styles.planPrice}>$88.00 AUD / year</Text>
                   <Text style={styles.planEquivalent}>Only $7.33 per month</Text>
                   <Text style={styles.planDescription}>
                     Full access to all premium features with yearly savings
@@ -389,7 +363,7 @@ export default function SubscriptionScreen() {
               <Text style={styles.oneOffPrice}>$360.00 AUD</Text>
               <Text style={styles.oneOffDescription}>
                 Get a comprehensive one-time cusp analysis with detailed insights, birthstone guidance,
-                personalized cosmic profile, and a copy of the AstroCusp ebook containing all cusp
+                personalized cosmic profile, and a copy of the AstroCusp ebook containing all cusp 
                 personalities without a subscription.
               </Text>
 
@@ -431,10 +405,8 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingTop: 20 },
   title: { fontSize: 36, fontFamily: 'PlayfairDisplay-Bold', color: '#e8e8e8', textAlign: 'center', marginBottom: 8, letterSpacing: 2 },
   subtitle: { fontSize: 16, fontFamily: 'Inter-Regular', color: '#8b9dc3', textAlign: 'center', marginBottom: 32, lineHeight: 24 },
-
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, fontFamily: 'Inter-Regular', color: '#8b9dc3', marginTop: 12 },
-
   statusCard: { borderRadius: 16, padding: 24, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(139, 157, 195, 0.3)' },
   statusHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   statusTitle: { fontSize: 20, fontFamily: 'PlayfairDisplay-Bold', color: '#e8e8e8', marginLeft: 12 },
@@ -442,16 +414,13 @@ const styles = StyleSheet.create({
   statusInactive: { fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#8b9dc3', textAlign: 'center', marginBottom: 8 },
   statusDescription: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#8b9dc3', textAlign: 'center', lineHeight: 20 },
   renewalDate: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#8b9dc3', textAlign: 'center', marginBottom: 16 },
-
   activeFeatures: { gap: 8, marginTop: 8 },
   featureItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   featureText: { fontSize: 14, fontFamily: 'Inter-Medium', color: '#e8e8e8', marginLeft: 8 },
-
   managementCard: { borderRadius: 16, padding: 20, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.3)' },
   managementHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   managementTitle: { fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#d4af37', marginLeft: 12 },
   buttonRow: { flexDirection: 'row', gap: 12, marginBottom: 12, flexWrap: 'wrap' },
-
   actionButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, minHeight: 44, gap: 8, flex: 1, minWidth: 120,
@@ -461,10 +430,8 @@ const styles = StyleSheet.create({
   upgradeButton: { backgroundColor: '#d4af37' },
   upgradeButtonText: { color: '#1a1a2e', fontFamily: 'Inter-SemiBold', fontSize: 14 },
   managementNote: { fontSize: 12, fontFamily: 'Inter-Regular', color: '#8b9dc3', textAlign: 'center', lineHeight: 16, fontStyle: 'italic' },
-
   subscriptionOptions: { marginBottom: 24 },
   optionsTitle: { fontSize: 22, fontFamily: 'PlayfairDisplay-Bold', color: '#e8e8e8', textAlign: 'center', marginBottom: 20 },
-
   planCard: { borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.3)' },
   yearlyPlanCard: { borderWidth: 2, borderColor: 'rgba(212, 175, 55, 0.5)' },
   planHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
@@ -476,7 +443,6 @@ const styles = StyleSheet.create({
   planDescription: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#8b9dc3', textAlign: 'center', lineHeight: 20, marginBottom: 16 },
   subscribeButton: { backgroundColor: '#d4af37' },
   subscribeButtonText: { color: '#1a1a2e', fontFamily: 'Inter-SemiBold', fontSize: 16 },
-
   oneOffCard: { borderRadius: 16, padding: 20, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(139, 157, 195, 0.3)' },
   oneOffHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   oneOffTitle: { fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#8b9dc3', marginLeft: 12 },
@@ -484,8 +450,6 @@ const styles = StyleSheet.create({
   oneOffDescription: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#e8e8e8', textAlign: 'center', lineHeight: 20, marginBottom: 16 },
   oneOffButton: { backgroundColor: '#8b9dc3', marginBottom: 12 },
   oneOffButtonText: { color: '#1a1a2e', fontFamily: 'Inter-SemiBold', fontSize: 16 },
-  oneOffNote: { fontSize: 12, fontFamily: 'Inter-Regular', color: '#8b9dc3', textAlign: 'center', lineHeight: 16, fontStyle: 'italic' },
-
   featuresSection: { marginTop: 16 },
   featuresTitle: { fontSize: 20, fontFamily: 'PlayfairDisplay-Bold', color: '#e8e8e8', textAlign: 'center', marginBottom: 16 },
   featuresList: {
@@ -497,7 +461,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   featureRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
-
   loadingOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(26, 26, 46, 0.8)', alignItems: 'center', justifyContent: 'center', borderRadius: 16,

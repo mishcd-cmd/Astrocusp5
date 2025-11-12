@@ -9,6 +9,8 @@ import {
   Alert,
   ScrollView,
   SafeAreaView,
+  Linking,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -22,7 +24,42 @@ import {
   buyOneOffReading,
   getSubscriptionStatus,
 } from '@/utils/billing';
-import { openBillingPortal } from '@/utils/openBillingPortal';
+
+// Helper to open billing portal without Capacitor (safe for web builds)
+async function openBillingPortalSafe() {
+  const base =
+    process.env.EXPO_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!base) {
+    throw new Error('Missing Supabase URL config');
+  }
+
+  const res = await fetch(`${base}/functions/v1/stripe-portal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    // Try to read an error body if present
+    let serverMsg = '';
+    try {
+      serverMsg = await res.text();
+    } catch {}
+    throw new Error(serverMsg || `Portal endpoint error ${res.status}`);
+  }
+
+  const data = await res.json();
+  const portalUrl = data?.url;
+  if (!portalUrl) throw new Error('Portal URL missing');
+
+  if (Platform.OS === 'web') {
+    window.location.href = portalUrl;
+  } else {
+    await Linking.openURL(portalUrl);
+  }
+}
 
 type SubStatus = {
   active: boolean;
@@ -61,19 +98,16 @@ export default function SubscriptionScreen() {
     else router.replace('/(tabs)/settings');
   };
 
-  // extra guard to avoid double taps
+  // Open Stripe customer portal (same tab on web, system browser on native)
   const onOpenPortal = async () => {
     if (actionLoading) return;
     try {
       setActionLoading('portal');
       console.log('[subscription] open portal clicked');
-      await openBillingPortal(); // native iOS uses system Safari, web uses same tab
+      await openBillingPortalSafe();
     } catch (e: any) {
       console.error('[subscription] portal error', e);
-      const msg =
-        e?.message ||
-        e?.error ||
-        'Failed to open billing portal.';
+      const msg = e?.message || e?.error || 'Failed to open billing portal.';
       Alert.alert('Billing Portal', msg);
     } finally {
       setActionLoading(null);
@@ -278,7 +312,7 @@ export default function SubscriptionScreen() {
                     style={[
                       styles.actionButton,
                       styles.portalButton,
-                      actionLoading === 'portal' && { opacity: 0.6 },
+                      actionLoading && { opacity: 0.6 },
                     ]}
                     onPress={onOpenPortal}
                     disabled={!!actionLoading}

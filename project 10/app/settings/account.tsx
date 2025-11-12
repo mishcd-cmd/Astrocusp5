@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { User, LogOut, Crown, CreditCard, Pencil, User as User2, Calendar, Clock, MapPin, Star, ArrowLeft } from 'lucide-react-native';
+import { User, LogOut, Crown, CreditCard, Pencil, User as User2, Calendar, Clock, MapPin, Star } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import CosmicBackground from '@/components/CosmicBackground';
 
@@ -12,11 +13,20 @@ import { getCurrentUser } from '@/utils/auth';
 import { getCosmicProfile, type CosmicProfile } from '@/utils/userProfile';
 import { openBillingPortal } from '@/utils/openBillingPortal';
 
+type SubStatus = {
+  active: boolean;
+  plan?: 'monthly' | 'yearly';
+  renewsAt?: string;
+  customerId?: string; // important
+  price_id?: string;
+  status?: string;
+} | null;
+
 export default function AccountDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [authed, setAuthed] = useState(false);
   const [email, setEmail] = useState<string>('');
-  const [subActive, setSubActive] = useState<boolean | null>(null);
+  const [subStatus, setSubStatus] = useState<SubStatus>(null);
   const [profile, setProfile] = useState<CosmicProfile>({});
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -30,26 +40,19 @@ export default function AccountDetailsScreen() {
 
           setTimeout(async () => {
             try {
-              const subscriptionStatus = await getSubscriptionStatus();
-              setSubActive(!!subscriptionStatus?.active);
+              const s = await getSubscriptionStatus();
+              setSubStatus(s);
             } catch (e) {
               console.error('[account] subscription check error', e);
-              setSubActive(false);
+              setSubStatus({ active: false });
             }
-          }, 500);
+          }, 400);
 
           try {
             const cosmicProfile = await getCosmicProfile();
-            console.log('🔍 [account] Loaded cosmic profile:', {
-              hasProfile: !!cosmicProfile,
-              birthDate: cosmicProfile?.birthDate,
-              birthTime: cosmicProfile?.birthTime,
-              birthCity: cosmicProfile?.birthCity,
-              hasZodiacResult: !!cosmicProfile?.zodiacResult
-            });
             setProfile(cosmicProfile || {});
           } catch (profileError) {
-            console.error('❌ [account] Error loading cosmic profile:', profileError);
+            console.error('❌ [account] profile load error', profileError);
             setProfile({});
           }
         } else {
@@ -67,15 +70,15 @@ export default function AccountDetailsScreen() {
   const goEditCosmicProfile = () => router.push('/settings/edit-profile');
 
   const onOpenBillingPortal = async () => {
-    if (portalLoading) return;
     try {
-      if (!authed) {
-        Alert.alert('Sign in required', 'Please sign in to manage your subscription.');
-        return;
-      }
       setPortalLoading(true);
-      console.log('[account] opening portal from', typeof window !== 'undefined' ? window.location.pathname : '(native)');
-      await openBillingPortal();
+      const customerId = subStatus?.customerId;
+      if (!customerId) {
+        // one quick refresh to try to fill it
+        const s = await getSubscriptionStatus();
+        setSubStatus(s);
+      }
+      await openBillingPortal(customerId || subStatus?.customerId || undefined);
     } catch (e: any) {
       console.error('[account] openBillingPortal error', e);
       Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');
@@ -102,12 +105,16 @@ export default function AccountDetailsScreen() {
       if (dateString.includes('/')) {
         const [day, month, year] = dateString.split('/');
         return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toLocaleDateString('en-GB', {
-          year: 'numeric', month: 'long', day: 'numeric'
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
         });
       } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
         const [year, month, day] = dateString.split('-').map(Number);
         return new Date(year, month - 1, day).toLocaleDateString('en-GB', {
-          year: 'numeric', month: 'long', day: 'numeric'
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
         });
       }
       return dateString;
@@ -127,7 +134,7 @@ export default function AccountDetailsScreen() {
         <CosmicBackground />
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#d4af37" />
-          <Text style={styles.loadingText}>Loading account...</Text>
+          <Text style={styles.loadingText}>Loading account…</Text>
         </View>
       </View>
     );
@@ -137,6 +144,8 @@ export default function AccountDetailsScreen() {
     profile?.zodiacResult?.cuspName ||
     profile?.zodiacResult?.primarySign ||
     'Not calculated yet';
+
+  const subActive = !!subStatus?.active;
 
   return (
     <View style={styles.container}>
@@ -149,7 +158,6 @@ export default function AccountDetailsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Account Details</Text>
 
-        {/* Auth block */}
         {authed ? (
           <LinearGradient colors={['rgba(212, 175, 55, 0.15)', 'rgba(212, 175, 55, 0.05)']} style={styles.card}>
             <View style={styles.row}>
@@ -172,7 +180,6 @@ export default function AccountDetailsScreen() {
           </LinearGradient>
         )}
 
-        {/* Cosmic Profile */}
         <LinearGradient colors={['rgba(139, 157, 195, 0.15)', 'rgba(139, 157, 195, 0.05)']} style={styles.card}>
           <View style={styles.row}>
             <User2 size={20} color="#8b9dc3" />
@@ -219,14 +226,13 @@ export default function AccountDetailsScreen() {
           </TouchableOpacity>
         </LinearGradient>
 
-        {/* Subscription */}
         <LinearGradient colors={['rgba(212, 175, 55, 0.15)', 'rgba(212, 175, 55, 0.05)']} style={styles.card}>
           <View style={styles.row}>
             <Crown size={20} color="#d4af37" />
             <Text style={styles.cardTitle}>Subscription</Text>
           </View>
 
-          {subActive === true ? (
+          {subActive ? (
             <>
               <Text style={styles.body}>
                 Status: <Text style={styles.good}>Active</Text>
@@ -237,7 +243,7 @@ export default function AccountDetailsScreen() {
                 disabled={portalLoading}
               >
                 <CreditCard size={16} color="#1a1a2e" />
-                <Text style={styles.btnTextDark}>{portalLoading ? 'Opening...' : 'Manage Subscription'}</Text>
+                <Text style={styles.btnTextDark}>{portalLoading ? 'Opening…' : 'Manage Subscription'}</Text>
               </TouchableOpacity>
             </>
           ) : subActive === false ? (
@@ -260,7 +266,6 @@ export default function AccountDetailsScreen() {
           )}
         </LinearGradient>
 
-        {/* Sign out */}
         {authed && (
           <LinearGradient colors={['rgba(220, 38, 38, 0.15)', 'rgba(220, 38, 38, 0.05)']} style={styles.card}>
             <View style={styles.row}>
