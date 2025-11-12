@@ -1,57 +1,39 @@
 // project 10/utils/openBillingPortal.native.ts
-import { supabase } from './supabase';
-import { Browser } from '@capacitor/browser';
+import { Browser } from '@capacitor/browser'
+import { supabase } from './supabase'
 
-/**
- * Native version
- * - Gets Supabase JWT and the user's stripe_customer_id
- * - Calls Netlify function with Authorization header and customerId in the body
- * - Opens Stripe portal in the system browser
- */
-export async function openBillingPortal(): Promise<void> {
-  // Ensure user is signed in and get token
-  const { data: sessionData, error: sessErr } = await supabase.auth.getSession();
-  if (sessErr) throw new Error('Not authenticated');
-  const token = sessionData.session?.access_token;
-  if (!token) throw new Error('No access token');
+export async function openBillingPortal() {
+  const { data: sessionData, error } = await supabase.auth.getSession()
+  if (error || !sessionData.session) {
+    throw new Error('You need to be signed in to manage billing.')
+  }
 
-  // Load stripe_customer_id from your profile row
-  const { data: userRes, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !userRes?.user) throw new Error('Invalid user');
+  const jwt = sessionData.session.access_token
+  const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/stripe-portal`
 
-  const userId = userRes.user.id;
-  const { data: profile, error: profErr } = await supabase
-    .from('profiles')                         // adjust if your table has a different name
-    .select('stripe_customer_id')
-    .eq('id', userId)
-    .single();
-
-  if (profErr) throw new Error(`Profile query error: ${profErr.message}`);
-  const customerId = profile?.stripe_customer_id;
-  if (!customerId) throw new Error('Stripe customer not found on profile');
-
-  // Call Netlify function. No cookies. Bearer only.
-  const res = await fetch('/.netlify/functions/portal', {
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${jwt}`,
     },
-    body: JSON.stringify({ customerId }),
-  });
+    // native also doesn’t need cookies here
+    credentials: 'omit',
+    body: JSON.stringify({}),
+  })
 
   if (!res.ok) {
-    const msg = await safeReadText(res);
-    throw new Error(msg || `Portal function error ${res.status}`);
+    const txt = await res.text().catch(() => '')
+    try {
+      const j = JSON.parse(txt)
+      throw new Error(j.error || 'Server error')
+    } catch {
+      throw new Error(txt || 'Server error')
+    }
   }
 
-  const { url } = await res.json();
-  if (!url) throw new Error('Portal URL missing');
+  const { url: portalUrl } = await res.json()
+  if (!portalUrl) throw new Error('No portal URL returned')
 
-  // System browser on native
-  await Browser.open({ url });
-}
-
-async function safeReadText(res: Response): Promise<string> {
-  try { return await res.text(); } catch { return ''; }
+  await Browser.open({ url: portalUrl, presentationStyle: 'fullscreen' })
 }
