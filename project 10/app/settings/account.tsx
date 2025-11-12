@@ -17,7 +17,7 @@ type SubStatus = {
   active: boolean;
   plan?: 'monthly' | 'yearly';
   renewsAt?: string;
-  customerId?: string; // important
+  customerId?: string;
   price_id?: string;
   status?: string;
 } | null;
@@ -38,16 +38,16 @@ export default function AccountDetailsScreen() {
           setAuthed(true);
           setEmail(user.email);
 
-          setTimeout(async () => {
-            try {
-              const s = await getSubscriptionStatus();
-              setSubStatus(s);
-            } catch (e) {
-              console.error('[account] subscription check error', e);
-              setSubStatus({ active: false });
-            }
-          }, 400);
+          // Fetch subscription status
+          try {
+            const s = await getSubscriptionStatus();
+            setSubStatus(s);
+          } catch (e) {
+            console.error('[account] subscription check error', e);
+            setSubStatus({ active: false });
+          }
 
+          // Fetch cosmic profile
           try {
             const cosmicProfile = await getCosmicProfile();
             setProfile(cosmicProfile || {});
@@ -72,13 +72,7 @@ export default function AccountDetailsScreen() {
   const onOpenBillingPortal = async () => {
     try {
       setPortalLoading(true);
-      const customerId = subStatus?.customerId;
-      if (!customerId) {
-        // one quick refresh to try to fill it
-        const s = await getSubscriptionStatus();
-        setSubStatus(s);
-      }
-      await openBillingPortal();
+      await openBillingPortal(); // unified helper uses Supabase JWT with credentials: 'omit'
     } catch (e: any) {
       console.error('[account] openBillingPortal error', e);
       Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');
@@ -107,14 +101,14 @@ export default function AccountDetailsScreen() {
         return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toLocaleDateString('en-GB', {
           year: 'numeric',
           month: 'long',
-          day: 'numeric'
+          day: 'numeric',
         });
       } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
         const [year, month, day] = dateString.split('-').map(Number);
         return new Date(year, month - 1, day).toLocaleDateString('en-GB', {
           year: 'numeric',
           month: 'long',
-          day: 'numeric'
+          day: 'numeric',
         });
       }
       return dateString;
@@ -124,8 +118,8 @@ export default function AccountDetailsScreen() {
   };
 
   const displayValue = (value?: string | null, placeholder = '—') => {
-    if (!value || value.trim() === '' || value === 'Unknown') return placeholder;
-    return value;
+    if (!value || `${value}`.trim() === '' || value === 'Unknown') return placeholder;
+    return `${value}`;
   };
 
   if (loading) {
