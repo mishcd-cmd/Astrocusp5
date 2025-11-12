@@ -18,6 +18,7 @@
     "@expo-google-fonts/vazirmatn": "^0.4.0",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-community/datetimepicker": "8.0.1",
+    "@stripe/stripe-js": "^3.5.0",
     "@supabase/supabase-js": "^2.56.0",
     "expo": "~51.0.28",
     "expo-blur": "~13.0.3",
