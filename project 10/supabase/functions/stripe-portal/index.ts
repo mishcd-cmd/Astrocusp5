@@ -1,118 +1,107 @@
-import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import Stripe from 'npm:stripe@17.7.0'
-import { createClient } from 'npm:@supabase/supabase-js@2.49.1'
+// supabase/functions/stripe-portal/index.ts
+// Creates a Stripe Billing Portal session and returns { url }
 
-/**
- * IMPORTANT:
- * - Client must call this with Authorization: Bearer <supabase_jwt>
- * - Use fetch(..., { credentials: 'omit' }) on web
- * - CORS '*' is fine since we are not using cookies
- */
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-function normalizeSiteUrl(raw?: string): string {
-  let base = (raw && raw.trim()) || 'https://astrocusp.com.au'
-  base = base.replace(/^http:\/\//i, 'https://')
-  base = base.replace(/^https:\/\/www\./i, 'https://')
-  base = base.replace(/\/+$/, '')
-  return base
-}
-
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 200, headers: corsHeaders })
+// ---- Minimal inline CORS helpers ----
+function corsHeaders(origin?: string) {
+  const allowed = new Set<string>([
+    'https://www.astrocusp.com.au',
+    'https://astrocusp.com.au',
+    'http://localhost:3000',
+    'http://localhost:19006',
+    'http://127.0.0.1:3000',
+  ])
+  const allowOrigin = origin && allowed.has(origin) ? origin : 'https://www.astrocusp.com.au'
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
   }
+}
+function handleOptions(req: Request) {
+  const origin = req.headers.get('origin') ?? undefined
+  return new Response('ok', { headers: corsHeaders(origin) })
+}
+// -------------------------------------
 
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return handleOptions(req)
+  const origin = req.headers.get('origin') ?? undefined
 
   try {
-    const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY')
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const siteUrl = normalizeSiteUrl(Deno.env.get('SITE_URL'))
-
-    if (!stripeSecret || !supabaseUrl || !supabaseServiceKey) {
-      console.error('[portal] Missing required environment variables')
-      return new Response(JSON.stringify({ error: 'Server misconfiguration' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const stripe = new Stripe(stripeSecret, { apiVersion: '2024-06-20' })
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
-    // Auth via Supabase JWT
-    const authHeader = req.headers.get('authorization')
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+    const auth = req.headers.get('Authorization') || ''
+    if (!auth.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Missing Bearer token' }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
       })
     }
-    const jwt = authHeader.replace('Bearer ', '')
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(jwt)
+    const jwt = auth.replace('Bearer ', '')
 
-    if (userError || !user) {
-      console.error('[portal] Auth error:', userError)
-      return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
+    const url = Deno.env.get('SUPABASE_URL')!
+    const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(url, key, { auth: { persistSession: false } })
+
+    const { data: user } = await supabase.auth.getUser(jwt)
+    const userId = user?.user?.id
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Unauthenticated' }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
       })
     }
 
-    // Find Stripe customer
-    const { data: sc, error: scError } = await supabase
-      .from('stripe_customers')
-      .select('customer_id')
-      .eq('user_id', user.id)
+    // Look up the Stripe customer id from your table
+    const { data: sub } = await supabase
+      .from('stripe_user_subscriptions')
+      .select('stripe_customer_id, customer_id')
+      .eq('customer_id', userId)
       .maybeSingle()
 
-    if (scError) {
-      console.error('[portal] DB error fetching stripe_customers:', scError)
-      return new Response(JSON.stringify({ error: 'Database error' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const stripeCustomerId =
+      sub?.stripe_customer_id || sub?.customer_id || Deno.env.get('STRIPE_FALLBACK_CUSTOMER_ID')
 
-    if (!sc?.customer_id) {
-      console.warn('[portal] Missing customer_id for user:', user.id, user.email)
-      return new Response(JSON.stringify({ error: 'Missing customerId' }), {
+    if (!stripeCustomerId) {
+      return new Response(JSON.stringify({ error: 'No Stripe customer' }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
       })
     }
 
-    // Create Stripe Billing Portal session
-    const session = await stripe.billingPortal.sessions.create({
-      customer: sc.customer_id,
-      return_url: `${siteUrl}/settings?portal=done`,
+    const stripeSecret = Deno.env.get('STRIPE_SECRET_KEY')!
+    const resp = await fetch('https://api.stripe.com/v1/billing_portal/sessions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${stripeSecret}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        customer: stripeCustomerId,
+        return_url: origin || 'https://www.astrocusp.com.au',
+      }),
     })
+    const j = await resp.json()
 
-    return new Response(JSON.stringify({ url: session.url }), {
+    if (!resp.ok) {
+      console.error('[stripe-portal] error', j)
+      return new Response(JSON.stringify({ error: j?.error?.message || 'Stripe error' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+      })
+    }
+
+    return new Response(JSON.stringify({ url: j?.url }), {
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
     })
-  } catch (error: any) {
-    console.error('❌ [portal] Error:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Portal error' }), {
+  } catch (err) {
+    console.error('[stripe-portal] error', err)
+    return new Response(JSON.stringify({ error: 'Unexpected error' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
     })
   }
 })
