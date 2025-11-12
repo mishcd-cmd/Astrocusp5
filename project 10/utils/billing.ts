@@ -1,17 +1,15 @@
-// Path: project10/utils/billing.ts
+// project10/utils/billing.ts (only the getSubscriptionStatus export shown here)
+// Keep your other exports (subscribeMonthly, etc.) as-is.
 
 import { supabase } from '@/utils/supabase';
-import {
-  checkoutSubscription,
-  checkoutOneTime,
-} from '@/utils/stripe';
 
-// -------- Types --------
-export type Plan = 'monthly' | 'yearly';
+const BASE =
+  process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-export type SubStatus = {
+type SubStatus = {
   active: boolean;
-  plan?: Plan | null;
+  plan?: 'monthly' | 'yearly' | null;
   renewsAt?: string | null;
   customerId?: string | null;
   price_id?: string | null;
@@ -19,85 +17,54 @@ export type SubStatus = {
   email?: string | null;
 } | null;
 
-// -------- Env helpers --------
-const BASE =
-  process.env.EXPO_PUBLIC_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-const PRICE_MONTHLY = process.env.EXPO_PUBLIC_STRIPE_PRICE_MONTHLY || '';
-const PRICE_YEARLY  = process.env.EXPO_PUBLIC_STRIPE_PRICE_YEARLY  || '';
-const PRICE_ONEOFF  = process.env.EXPO_PUBLIC_STRIPE_PRICE_ONEOFF  || '';
-
-function requireBase() {
-  if (!BASE) throw new Error('Missing Supabase URL config');
-}
-
-function requireAuthToken(session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']) {
-  const token = session?.session?.access_token;
-  if (!token) throw new Error('Not authenticated');
-  return token;
-}
-
-function ensurePrice(id: string, label: string) {
-  if (!id || id.trim() === '') throw new Error(`${label} price not configured`);
-  return id;
-}
-
-// -------- API: subscription status (Edge Function) --------
 export async function getSubscriptionStatus(): Promise<SubStatus> {
-  requireBase();
+  try {
+    if (!BASE) {
+      console.error('[billing] Missing Supabase URL config (EXPO_PUBLIC_SUPABASE_URL)');
+      return { active: false, status: 'error:missing_base' };
+    }
 
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw new Error(error.message || 'Auth error');
-  const token = requireAuthToken(data);
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.error('[billing] auth.getSession error', error);
+      return { active: false, status: 'error:no_session' };
+    }
+    const token = data?.session?.access_token;
+    if (!token) {
+      console.warn('[billing] No session token');
+      return { active: false, status: 'error:no_token' };
+    }
 
-  const res = await fetch(`${BASE}/functions/v1/subscription-status`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    credentials: 'omit', // important for CORS
-    body: JSON.stringify({}),
-  });
+    const url = `${BASE}/functions/v1/subscription-status`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      credentials: 'omit', // keep cross-origin clean
+      body: JSON.stringify({}),
+    });
 
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    throw new Error(txt || `subscription-status error ${res.status}`);
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.error('[billing] subscription-status bad response', res.status, text);
+      return { active: false, status: `error:${res.status}` };
+    }
+
+    const json = await res.json().catch(() => ({}));
+    // Expecting the shape from the Edge Function
+    return {
+      active: !!json.active,
+      plan: json.plan ?? null,
+      renewsAt: json.renewsAt ?? null,
+      customerId: json.customerId ?? null,
+      price_id: json.price_id ?? null,
+      status: json.status ?? 'unknown',
+      email: json.email ?? null,
+    };
+  } catch (e: any) {
+    console.error('[billing] getSubscriptionStatus exception', e?.message || e);
+    return { active: false, status: 'error:exception' };
   }
-
-  return (await res.json()) as SubStatus;
-}
-
-// -------- Actions: checkout helpers --------
-export async function subscribeMonthly(): Promise<void> {
-  const priceId = ensurePrice(PRICE_MONTHLY, 'Monthly');
-  await checkoutSubscription({
-    priceId,
-    // optional success/cancel — omit to let your Netlify function default/returnPath handle it
-  });
-}
-
-export async function subscribeYearly(): Promise<void> {
-  const priceId = ensurePrice(PRICE_YEARLY, 'Yearly');
-  await checkoutSubscription({
-    priceId,
-  });
-}
-
-// Simple upgrade path: send the user to a new checkout for the yearly price
-// (Stripe will handle proration if you enable it in the price/product settings)
-export async function upgradeToYearly(): Promise<{ message: string }> {
-  const priceId = ensurePrice(PRICE_YEARLY, 'Yearly');
-  await checkoutSubscription({
-    priceId,
-  });
-  return { message: 'Redirecting to upgrade checkout…' };
-}
-
-export async function buyOneOffReading(): Promise<void> {
-  const priceId = ensurePrice(PRICE_ONEOFF, 'One-off');
-  await checkoutOneTime({
-    priceId,
-  });
 }

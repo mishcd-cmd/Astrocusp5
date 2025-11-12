@@ -1,22 +1,21 @@
-// Creates a Stripe Billing Portal session and returns { url }
-// Path: supabase/functions/stripe-portal/index.ts
+// supabase/functions/stripe-portal/index.ts
+// Creates a Stripe Billing Portal session and returns { url }.
+// Single file with full CORS and Supabase auth verification.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const ORIGIN = Deno.env.get("ALLOWED_ORIGIN") || "https://www.astrocusp.com.au";
-const STRIPE_SECRET = Deno.env.get("STRIPE_SECRET_KEY")!;
-const PORTAL_RETURN_URL = Deno.env.get("PORTAL_RETURN_URL") || "https://www.astrocusp.com.au/settings/account";
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const ORIGIN_FALLBACK = "https://www.astrocusp.com.au";
+const STRIPE_SECRET = Deno.env.get("STRIPE_SECRET_KEY");
+const PORTAL_RETURN_URL = Deno.env.get("PORTAL_RETURN_URL") || ORIGIN_FALLBACK;
 
 function corsHeaders(origin: string | null): Headers {
   const h = new Headers();
-  h.set("Access-Control-Allow-Origin", origin || ORIGIN);
-  h.set("Vary", "Origin");
-  h.set("Access-Control-Allow-Credentials", "true");
+  h.set("Access-Control-Allow-Origin", origin || Deno.env.get("ALLOWED_ORIGIN") || ORIGIN_FALLBACK);
   h.set("Access-Control-Allow-Headers", "authorization, x-client-info, apikey, content-type");
   h.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  h.set("Access-Control-Allow-Credentials", "true");
   h.set("Access-Control-Max-Age", "86400");
+  h.set("Vary", "Origin");
   return h;
 }
 
@@ -33,62 +32,78 @@ function errJson(message: string, origin: string | null, status = 400) {
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin");
 
-  // CORS preflight
+  // *** CRUCIAL: preflight must be 200 + headers
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders(origin) });
+    return new Response("ok", { status: 200, headers: corsHeaders(origin) });
   }
+
   if (req.method !== "POST") {
     return errJson("Method not allowed", origin, 405);
   }
 
-  // Auth
-  const auth = req.headers.get("Authorization") || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-  if (!token) return errJson("Missing bearer token", origin, 401);
-
-  // Get user from Supabase
-  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "apikey": SUPABASE_ANON_KEY,
-    },
-  });
-  if (!userRes.ok) return errJson("Invalid or expired token", origin, 401);
-
-  const user = await userRes.json().catch(() => null);
-  const userId = user?.id as string | undefined;
-  const email = user?.email as string | undefined;
-  if (!userId) return errJson("Auth user missing", origin, 401);
-
-  // Resolve existing Stripe customer by email, or create as fallback
-  let customerId: string | null = null;
-
-  if (email) {
-    const searchRes = await fetch("https://api.stripe.com/v1/customers/search", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${STRIPE_SECRET}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({ query: `email:"${email}"` }),
-    });
-    if (searchRes.ok) {
-      const s = await searchRes.json();
-      if (s?.data?.length > 0) customerId = s.data[0].id;
-    }
+  if (!STRIPE_SECRET) {
+    return errJson("Server misconfigured (STRIPE_SECRET_KEY)", origin, 500);
   }
 
+  // Require Supabase user JWT (from client)
+  const auth = req.headers.get("Authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (!token) {
+    return errJson("Missing bearer token", origin, 401);
+  }
+
+  // Verify user
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return errJson("Server misconfigured (SUPABASE_URL/ANON_KEY)", origin, 500);
+  }
+
+  const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: supabaseAnonKey,
+    },
+  });
+
+  if (!userRes.ok) {
+    return errJson("Invalid or expired token", origin, 401);
+  }
+
+  const user = await userRes.json().catch(() => null);
+  const email = user?.email as string | undefined;
+  const userId = user?.id as string | undefined;
+  if (!userId) {
+    return errJson("Auth user missing", origin, 401);
+  }
+
+  // Resolve or create Stripe customer (email-based)
+  let customerId: string | null = null;
+
+  const search = await fetch("https://api.stripe.com/v1/customers/search", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${STRIPE_SECRET}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({ query: `email:"${email}"` }),
+  });
+
+  if (search.ok) {
+    const s = await search.json();
+    if (s?.data?.length > 0) customerId = s.data[0].id;
+  }
   if (!customerId) {
     const createRes = await fetch("https://api.stripe.com/v1/customers", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${STRIPE_SECRET}`,
+        Authorization: `Bearer ${STRIPE_SECRET}`,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
         email: email ?? "",
-        // Correct Stripe metadata encoding
-        ["metadata[supabase_user_id]"]: userId,
+        // Minimal metadata to link back if you later store it
+        "metadata[supabase_user_id]": userId,
       }),
     });
     if (!createRes.ok) {
@@ -103,7 +118,7 @@ Deno.serve(async (req) => {
   const portalRes = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${STRIPE_SECRET}`,
+      Authorization: `Bearer ${STRIPE_SECRET}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: new URLSearchParams({
