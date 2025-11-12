@@ -1,227 +1,142 @@
 // project10/utils/billing.ts
-import { supabase } from './supabase'
-import {
-  checkoutSubscription,
-  checkoutOneTime,
-  isStripeConfigured,
-  type StripeProduct,
-} from './stripe'
+import { Platform, Linking } from 'react-native';
+import { supabase } from './supabase';
 
-export type SubPlan = 'monthly' | 'yearly' | undefined
-export type SubStatus = {
-  active: boolean
-  plan?: SubPlan
-  renewsAt?: string
-  customerId?: string
-  price_id?: string
-  status?: string
-} | null
-
-// Price IDs from env (leave as-is if you already have them set)
-const PRICE_MONTHLY =
-  process.env.EXPO_PUBLIC_STRIPE_MONTHLY_PRICE ||
-  process.env.NEXT_PUBLIC_STRIPE_MONTHLY_PRICE
-
-const PRICE_YEARLY =
-  process.env.EXPO_PUBLIC_STRIPE_YEARLY_PRICE ||
-  process.env.NEXT_PUBLIC_STRIPE_YEARLY_PRICE
-
-const PRICE_ONEOFF =
-  process.env.EXPO_PUBLIC_STRIPE_ONEOFF_PRICE ||
-  process.env.NEXT_PUBLIC_STRIPE_ONEOFF_PRICE
+// Read envs in both Expo + web builds
+const PUB = (k: string) =>
+  (process.env[k] ||
+    (global as any).__env?.[k] ||
+    undefined) as string | undefined;
 
 const SUPABASE_URL =
-  process.env.EXPO_PUBLIC_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL
+  PUB('EXPO_PUBLIC_SUPABASE_URL') ||
+  PUB('NEXT_PUBLIC_SUPABASE_URL') ||
+  '';
 
-const hasSupabaseEdge = Boolean(SUPABASE_URL)
+const PRICE_MONTHLY = PUB('EXPO_PUBLIC_STRIPE_PRICE_MONTHLY') || '';
+const PRICE_YEARLY  = PUB('EXPO_PUBLIC_STRIPE_PRICE_YEARLY')  || '';
+const PRICE_ONEOFF  = PUB('EXPO_PUBLIC_STRIPE_PRICE_ONEOFF')  || '';
 
-// Optional Netlify fallbacks if you use them
-const NF_SUB_STATUS = '/.netlify/functions/subscription-status'
-const NF_UPGRADE = '/.netlify/functions/upgrade-to-yearly'
-const NF_PORTAL = '/.netlify/functions/portal'
-
-// ---------- helpers ----------
-async function fetchWithAuth(url: string, init: RequestInit = {}) {
-  const { data, error } = await supabase.auth.getSession()
-  const token = error ? undefined : data?.session?.access_token
-
-  const headers: Record<string, string> = {
-    ...(init.headers as Record<string, string>),
-    'Content-Type': 'application/json',
-  }
-  if (token) headers.Authorization = `Bearer ${token}`
-
-  return fetch(url, { ...init, headers })
+export function isStripeConfigured() {
+  const ok = !!(PRICE_MONTHLY || PRICE_YEARLY || PRICE_ONEOFF);
+  console.log('[Stripe] Configuration check result:', {
+    monthly: !!PRICE_MONTHLY,
+    yearly: !!PRICE_YEARLY,
+    oneOff: !!PRICE_ONEOFF,
+  });
+  return ok;
 }
 
-function ensureAbsolute(path: string): string {
-  if (!path.startsWith('/')) return path
-  if (typeof window === 'undefined') return path
-  const u = new URL(window.location.href)
-  u.pathname = path
-  u.search = ''
-  return u.toString()
+// ---- helpers ----
+async function getJWT() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw new Error(error.message || 'Auth error');
+  const token = data?.session?.access_token;
+  if (!token) throw new Error('Not authenticated');
+  return token;
 }
 
-function planFromPriceId(price?: string | null): SubPlan {
-  if (!price) return undefined
-  const p = String(price).toLowerCase()
-  if (p.includes('year')) return 'yearly'
-  if (p.includes('month')) return 'monthly'
-  return undefined
-}
-
-function normalizeStatus(raw: any): SubStatus {
-  if (!raw || typeof raw !== 'object') return { active: false }
-  const price = raw.price_id ?? raw.priceId
-  const status = raw.status ?? raw.subscription_status
-  const renew =
-    raw.renewsAt ?? raw.current_period_end ?? raw.renew_at ?? raw.current_period_end_at
-
-  return {
-    active: Boolean(
-      raw.active ||
-        status === 'active' ||
-        status === 'trialing' ||   // consider trialing as active for gating
-        status === 'past_due'      // optional: treat as active so user isn’t blocked
-    ),
-    plan: raw.plan ?? planFromPriceId(price),
-    renewsAt: typeof renew === 'number' ? new Date(renew * 1000).toISOString() : renew,
-    customerId: raw.customerId ?? raw.customer_id ?? raw.stripe_customer_id,
-    price_id: price ?? undefined,
-    status: status ?? (raw.active ? 'active' : undefined),
+async function openUrlSameTab(url: string) {
+  if (Platform.OS === 'web') {
+    window.location.assign(url);
+  } else {
+    await Linking.openURL(url);
   }
 }
 
-// ---------- table fallback (no functions required) ----------
-async function tableSubscriptionFallback(): Promise<SubStatus> {
-  try {
-    const { data: ses } = await supabase.auth.getSession()
-    const userId = ses?.session?.user?.id
-    if (!userId) return { active: false }
+// ---- subscription status ----
+export type SubStatus = {
+  active: boolean;
+  plan?: 'monthly' | 'yearly';
+  renewsAt?: string;
+  customerId?: string;
+  price_id?: string;
+  status?: string;
+} | null;
 
-    // Your table name/columns (you already referenced this in your code):
-    // stripe_user_subscriptions: { customer_id, subscription_status, price_id, current_period_end, cancel_at_period_end }
-    const { data, error } = await supabase
-      .from('stripe_user_subscriptions')
-      .select('*')
-      .eq('customer_id', userId)
-      .maybeSingle()
-
-    if (error || !data) return { active: false }
-
-    return normalizeStatus({
-      active: data.subscription_status === 'active' || data.subscription_status === 'trialing' || data.subscription_status === 'past_due',
-      status: data.subscription_status,
-      price_id: data.price_id,
-      current_period_end: data.current_period_end,
-      customer_id: data.customer_id,
-    })
-  } catch (e) {
-    console.error('[billing] tableSubscriptionFallback error', e)
-    return { active: false }
-  }
-}
-
-// ---------- public API ----------
 export async function getSubscriptionStatus(): Promise<SubStatus> {
-  // 1) Try Supabase Edge function if you actually have it
-  if (hasSupabaseEdge) {
-    try {
-      const res = await fetchWithAuth(`${SUPABASE_URL}/functions/v1/subscription-status`, {
-        method: 'GET',
-      })
-      if (res.ok) {
-        const json = await res.json()
-        return normalizeStatus(json)
-      }
-    } catch (e) {
-      // fall through to next strategy
-    }
-  }
+  const base = SUPABASE_URL;
+  if (!base) throw new Error('Missing Supabase URL config');
 
-  // 2) Try Netlify function if you use Netlify
-  try {
-    const res = await fetchWithAuth(NF_SUB_STATUS, { method: 'GET' })
-    if (res.ok) {
-      const json = await res.json()
-      return normalizeStatus(json)
-    }
-  } catch (e) {
-    // fall through
-  }
+  const token = await getJWT();
 
-  // 3) Fallback: query your Supabase table directly (works today)
-  return tableSubscriptionFallback()
+  const res = await fetch(`${base}/functions/v1/subscription-status`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    credentials: 'omit', // critical for CORS
+  });
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(t || `subscription-status ${res.status}`);
+  }
+  return (await res.json()) as SubStatus;
+}
+
+// ---- portal ----
+export async function openBillingPortal(): Promise<void> {
+  const base = SUPABASE_URL;
+  if (!base) throw new Error('Missing Supabase URL config');
+  const token = await getJWT();
+
+  const res = await fetch(`${base}/functions/v1/stripe-portal`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    credentials: 'omit',
+    body: JSON.stringify({}),
+  });
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(t || `stripe-portal ${res.status}`);
+  }
+  const { url } = await res.json();
+  if (!url) throw new Error('Portal URL missing');
+  await openUrlSameTab(url);
+}
+
+// ---- checkout (Netlify function you already have) ----
+async function postCheckout(body: Record<string, unknown>) {
+  const res = await fetch('/.netlify/functions/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let msg = 'Checkout failed';
+    try { msg = (await res.json())?.error || msg; } catch {}
+    throw new Error(msg);
+  }
+  const { url } = await res.json();
+  if (!url) throw new Error('No checkout URL returned');
+  return url as string;
 }
 
 export async function subscribeMonthly() {
-  if (!PRICE_MONTHLY) throw new Error('Monthly price not configured')
-  await checkoutSubscription({
-    priceId: PRICE_MONTHLY,
-    successUrl: ensureAbsolute('/settings/account?success=1'),
-    cancelUrl: ensureAbsolute('/subscription?canceled=1'),
-  })
+  if (!PRICE_MONTHLY) throw new Error('Monthly price not configured');
+  const url = await postCheckout({ priceId: PRICE_MONTHLY, mode: 'subscription' });
+  await openUrlSameTab(url);
 }
 
 export async function subscribeYearly() {
-  if (!PRICE_YEARLY) throw new Error('Yearly price not configured')
-  await checkoutSubscription({
-    priceId: PRICE_YEARLY,
-    successUrl: ensureAbsolute('/settings/account?success=1'),
-    cancelUrl: ensureAbsolute('/subscription?canceled=1'),
-  })
+  if (!PRICE_YEARLY) throw new Error('Yearly price not configured');
+  const url = await postCheckout({ priceId: PRICE_YEARLY, mode: 'subscription' });
+  await openUrlSameTab(url);
 }
 
 export async function buyOneOffReading() {
-  if (!PRICE_ONEOFF) throw new Error('One-off price not configured')
-  await checkoutOneTime({
-    priceId: PRICE_ONEOFF,
-    successUrl: ensureAbsolute('/settings/account?success=1'),
-    cancelUrl: ensureAbsolute('/subscription?canceled=1'),
-  })
+  if (!PRICE_ONEOFF) throw new Error('One-off price not configured');
+  const url = await postCheckout({ priceId: PRICE_ONEOFF, mode: 'payment' });
+  await openUrlSameTab(url);
 }
 
-export async function upgradeToYearly(): Promise<{ message: string }> {
-  // Prefer Edge/Netlify if you have it; otherwise, you can also implement a table-side upgrade flow later
-  const endpoint = hasSupabaseEdge
-    ? `${SUPABASE_URL}/functions/v1/upgrade-to-yearly`
-    : NF_UPGRADE
-
-  const res = await fetchWithAuth(endpoint, { method: 'POST', body: '{}' })
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '')
-    throw new Error(txt || `Upgrade failed ${res.status}`)
-  }
-  const json = (await res.json().catch(() => ({}))) as { message?: string }
-  return { message: json?.message || 'Upgraded to yearly' }
+export async function upgradeToYearly() {
+  // You can implement an upgrade Edge Function later.
+  // For now redirect to the billing portal so the user can switch plan.
+  await openBillingPortal();
 }
-
-export async function openBillingPortal(): Promise<void> {
-  const endpoint = hasSupabaseEdge
-    ? `${SUPABASE_URL}/functions/v1/stripe-portal`
-    : NF_PORTAL
-
-  const res = await fetchWithAuth(endpoint, {
-    method: 'POST',
-    body: '{}',
-  })
-  if (!res.ok) {
-    const txt = await res.text().catch(() => '')
-    throw new Error(txt || `Portal error ${res.status}`)
-  }
-  const json = await res.json().catch(() => ({}))
-  const portalUrl: string | undefined = json?.url
-  if (!portalUrl) throw new Error('Portal URL missing')
-
-  if (typeof window !== 'undefined') {
-    window.location.assign(portalUrl)
-  } else {
-    const { Linking } = await import('react-native')
-    await Linking.openURL(portalUrl)
-  }
-}
-
-// Re-export so callers can feature-gate UI
-export { isStripeConfigured }
