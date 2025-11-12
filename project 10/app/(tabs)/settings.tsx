@@ -12,7 +12,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { User, Info, FileText, Crown, ArrowLeft, Languages } from 'lucide-react-native';
-import CosmicBackground from '../../components/CosmicBackground';
+
+// IMPORTANT: use the alias import so the component actually resolves
+import CosmicBackground from '@/components/CosmicBackground';
+import ErrorBoundary from '@/components/ErrorBoundary';
+
 import { getUserLanguage, setUserLanguage, type SupportedLanguage } from '@/utils/translation';
 import { signOut, getCurrentUser } from '@/utils/auth';
 import { clearUserData } from '@/utils/userData';
@@ -41,25 +45,19 @@ function useKillInjectedAdminCards() {
     if (Platform.OS !== 'web' || typeof window === 'undefined' || !document?.body) return;
 
     const kill = () => {
-      // remove any clickable card whose text matches our admin/duplicate patterns
       const all = Array.from(document.querySelectorAll<HTMLElement>('*'));
       for (const el of all) {
         const text = el.innerText || el.textContent || '';
         if (looksLikeHiddenAdminText(text)) {
-          // Remove the nearest card-like container
           const card = el.closest('[role="button"],a,button,div');
           (card as HTMLElement | null)?.remove?.();
         }
       }
     };
 
-    // run once now
     kill();
-
-    // keep watching for runtime injections
     const obs = new MutationObserver(() => kill());
     obs.observe(document.body, { childList: true, subtree: true });
-
     return () => obs.disconnect();
   }, []);
 }
@@ -69,7 +67,6 @@ export default function SettingsScreen() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Run the sweeper on web so injected admin tiles disappear immediately
   useKillInjectedAdminCards();
 
   useEffect(() => {
@@ -117,6 +114,8 @@ export default function SettingsScreen() {
         router.push('/settings/account');
         break;
       case 'subscription':
+        // If your subscription screen is at /app/subscription.tsx use '/subscription'
+        // If it lives at /app/settings/subscription.tsx use '/settings/subscription'
         router.push('/subscription');
         break;
       case 'about':
@@ -194,120 +193,122 @@ export default function SettingsScreen() {
       <CosmicBackground />
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.content}>
-            <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
-              <ArrowLeft size={24} color="#8b9dc3" />
-              <Text style={styles.backText}>Back</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.title}>Settings</Text>
-            <Text style={styles.subtitle}>
-              Manage your cosmic journey and app preferences
-            </Text>
-
-            <View style={styles.menuOptions}>
-              {/* Cache buster comment - updated 2025-09-05-v3 - KILL ADMIN CARDS */}
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => handleMenuOption('account')}
-              >
-                <LinearGradient
-                  colors={['rgba(139, 157, 195, 0.2)', 'rgba(139, 157, 195, 0.1)']}
-                  style={styles.menuOptionGradient}
-                >
-                  <User size={24} color="#8b9dc3" />
-                  <View style={styles.menuOptionContent}>
-                    <Text style={styles.menuOptionTitle}>Account</Text>
-                    <Text style={styles.menuOptionDescription}>
-                      View and edit your cosmic profile, or <Text style={styles.signOutText}>sign out</Text>
-                    </Text>
-                  </View>
-                </LinearGradient>
+          <ErrorBoundary>
+            <View style={styles.content}>
+              <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
+                <ArrowLeft size={24} color="#8b9dc3" />
+                <Text style={styles.backText}>Back</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => router.push('/settings/subscription')}
-              >
-                <LinearGradient
-                  colors={['rgba(212, 175, 55, 0.2)', 'rgba(212, 175, 55, 0.1)']}
-                  style={styles.menuOptionGradient}
-                >
-                  <Crown size={24} color="#d4af37" />
-                  <View style={styles.menuOptionContent}>
-                    <Text style={styles.menuOptionTitle}>Astral Plane</Text>
-                    <Text style={styles.menuOptionDescription}>
-                      Manage your premium subscription
-                    </Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
+              <Text style={styles.title}>Settings</Text>
+              <Text style={styles.subtitle}>
+                Manage your cosmic journey and app preferences
+              </Text>
 
-              {/* Translation feature temporarily hidden - keeping script for future Chinese market
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={handleLanguageToggle}
-              >
-                <LinearGradient
-                  colors={['rgba(212, 175, 55, 0.2)', 'rgba(212, 175, 55, 0.1)']}
-                  style={styles.menuOptionGradient}
+              <View style={styles.menuOptions}>
+                {/* Cache buster comment - updated 2025-09-05-v3 - KILL ADMIN CARDS */}
+                <TouchableOpacity
+                  style={styles.menuOption}
+                  onPress={() => handleMenuOption('account')}
                 >
-                  <Languages size={24} color="#d4af37" />
-                  <View style={styles.menuOptionContent}>
-                    <Text style={styles.menuOptionTitle}>
-                      {currentLanguage === 'zh' ? '切换到英文 (Switch to English)' : '中文翻译 (Chinese)'}
-                    </Text>
-                    <Text style={styles.menuOptionDescription}>
-                      {currentLanguage === 'zh'
-                        ? '切换回英文界面 Switch back to English interface'
-                        : 'Translate the app to Mandarin Chinese 将应用翻译成中文'
-                      }
-                    </Text>
-                    <Text style={styles.refreshNote}>
-                      You must refresh your page
-                    </Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-              */}
+                  <LinearGradient
+                    colors={['rgba(139, 157, 195, 0.2)', 'rgba(139, 157, 195, 0.1)']}
+                    style={styles.menuOptionGradient}
+                  >
+                    <User size={24} color="#8b9dc3" />
+                    <View style={styles.menuOptionContent}>
+                      <Text style={styles.menuOptionTitle}>Account</Text>
+                      <Text style={styles.menuOptionDescription}>
+                        View and edit your cosmic profile, or <Text style={styles.signOutText}>sign out</Text>
+                      </Text>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => handleMenuOption('about')}
-              >
-                <LinearGradient
-                  colors={['rgba(139, 157, 195, 0.2)', 'rgba(139, 157, 195, 0.1)']}
-                  style={styles.menuOptionGradient}
+                <TouchableOpacity
+                  style={styles.menuOption}
+                  onPress={() => handleMenuOption('subscription')}
                 >
-                  <Info size={24} color="#8b9dc3" />
-                  <View style={styles.menuOptionContent}>
-                    <Text style={styles.menuOptionTitle}>About Astro Cusp</Text>
-                    <Text style={styles.menuOptionDescription}>
-                      Learn how to use the app and features
-                    </Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
+                  <LinearGradient
+                    colors={['rgba(212, 175, 55, 0.2)', 'rgba(212, 175, 55, 0.1)']}
+                    style={styles.menuOptionGradient}
+                  >
+                    <Crown size={24} color="#d4af37" />
+                    <View style={styles.menuOptionContent}>
+                      <Text style={styles.menuOptionTitle}>Astral Plane</Text>
+                      <Text style={styles.menuOptionDescription}>
+                        Manage your premium subscription
+                      </Text>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuOption}
-                onPress={() => handleMenuOption('terms')}
-              >
-                <LinearGradient
-                  colors={['rgba(139, 157, 195, 0.2)', 'rgba(139, 157, 195, 0.1)']}
-                  style={styles.menuOptionGradient}
+                {/* Translation feature kept for future use
+                <TouchableOpacity
+                  style={styles.menuOption}
+                  onPress={handleLanguageToggle}
                 >
-                  <FileText size={24} color="#8b9dc3" />
-                  <View style={styles.menuOptionContent}>
-                    <Text style={styles.menuOptionTitle}>Terms & Conditions</Text>
-                    <Text style={styles.menuOptionDescription}>
-                      Review our terms and privacy policy
-                    </Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
+                  <LinearGradient
+                    colors={['rgba(212, 175, 55, 0.2)', 'rgba(212, 175, 55, 0.1)']}
+                    style={styles.menuOptionGradient}
+                  >
+                    <Languages size={24} color="#d4af37" />
+                    <View style={styles.menuOptionContent}>
+                      <Text style={styles.menuOptionTitle}>
+                        {currentLanguage === 'zh' ? '切换到英文 (Switch to English)' : '中文翻译 (Chinese)'}
+                      </Text>
+                      <Text style={styles.menuOptionDescription}>
+                        {currentLanguage === 'zh'
+                          ? '切换回英文界面 Switch back to English interface'
+                          : 'Translate the app to Mandarin Chinese 将应用翻译成中文'
+                        }
+                      </Text>
+                      <Text style={styles.refreshNote}>
+                        You must refresh your page
+                      </Text>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+                */}
+
+                <TouchableOpacity
+                  style={styles.menuOption}
+                  onPress={() => handleMenuOption('about')}
+                >
+                  <LinearGradient
+                    colors={['rgba(139, 157, 195, 0.2)', 'rgba(139, 157, 195, 0.1)']}
+                    style={styles.menuOptionGradient}
+                  >
+                    <Info size={24} color="#8b9dc3" />
+                    <View style={styles.menuOptionContent}>
+                      <Text style={styles.menuOptionTitle}>About Astro Cusp</Text>
+                      <Text style={styles.menuOptionDescription}>
+                        Learn how to use the app and features
+                      </Text>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.menuOption}
+                  onPress={() => handleMenuOption('terms')}
+                >
+                  <LinearGradient
+                    colors={['rgba(139, 157, 195, 0.2)', 'rgba(139, 157, 195, 0.1)']}
+                    style={styles.menuOptionGradient}
+                  >
+                    <FileText size={24} color="#8b9dc3" />
+                    <View style={styles.menuOptionContent}>
+                      <Text style={styles.menuOptionTitle}>Terms & Conditions</Text>
+                      <Text style={styles.menuOptionDescription}>
+                        Review our terms and privacy policy
+                      </Text>
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </ErrorBoundary>
         </ScrollView>
       </SafeAreaView>
     </View>
