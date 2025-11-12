@@ -7,8 +7,8 @@ const FUNCTION_URL =
 export async function openBillingPortal(): Promise<void> {
   console.log('[openBillingPortal.web] start');
 
-  const { data: sessionData, error: sessionError } =
-    await supabase.auth.getSession();
+  // Get Supabase JWT
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   if (sessionError) {
     console.error('[openBillingPortal.web] getSession error', sessionError);
     throw new Error('Not authenticated');
@@ -19,14 +19,14 @@ export async function openBillingPortal(): Promise<void> {
     throw new Error('Not authenticated');
   }
 
-  // Important on web: no cookies
+  // IMPORTANT: credentials: 'omit' so CORS with '*' is allowed
   const res = await fetch(FUNCTION_URL, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    credentials: 'omit',
+    credentials: 'omit', // <— THIS fixes the CORS error
     body: JSON.stringify({}),
   });
 
@@ -42,6 +42,6 @@ export async function openBillingPortal(): Promise<void> {
     throw new Error('No portal URL received');
   }
 
-  // Navigate current tab to the portal
-  window.location.href = json.url;
+  // Navigate to Stripe portal
+  window.location.assign(json.url);
 }

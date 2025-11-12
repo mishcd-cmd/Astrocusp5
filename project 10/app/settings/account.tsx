@@ -78,7 +78,7 @@ export default function AccountDetailsScreen() {
         const s = await getSubscriptionStatus();
         setSubStatus(s);
       }
-      await openBillingPortal(customerId || subStatus?.customerId || undefined);
+      await openBillingPortal();
     } catch (e: any) {
       console.error('[account] openBillingPortal error', e);
       Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');

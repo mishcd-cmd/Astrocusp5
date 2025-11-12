@@ -69,7 +69,7 @@ export default function SubscriptionScreen() {
         // last resort: refresh once to try to obtain it
         await refreshStatus();
       }
-      await openBillingPortal(customerId || status?.customerId || undefined);
+      await openBillingPortal();
     } catch (e: any) {
       console.error('[subscription] portal error', e);
       Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');
