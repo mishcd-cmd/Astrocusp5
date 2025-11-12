@@ -2,8 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
-import { User, LogOut, Crown, UserCog, CreditCard, Pencil, User as User2, Calendar, Clock, MapPin, Star } from 'lucide-react-native';
-import { ArrowLeft } from 'lucide-react-native';
+import { User, LogOut, Crown, CreditCard, Pencil, User as User2, Calendar, Clock, MapPin, Star, ArrowLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import CosmicBackground from '@/components/CosmicBackground';
 
@@ -29,18 +28,16 @@ export default function AccountDetailsScreen() {
           setAuthed(true);
           setEmail(user.email);
 
-          // slight delay so auth state is fully settled
           setTimeout(async () => {
             try {
               const subscriptionStatus = await getSubscriptionStatus();
-              setSubActive(subscriptionStatus?.active || false);
+              setSubActive(!!subscriptionStatus?.active);
             } catch (e) {
               console.error('[account] subscription check error', e);
               setSubActive(false);
             }
           }, 500);
 
-          // load profile
           try {
             const cosmicProfile = await getCosmicProfile();
             console.log('🔍 [account] Loaded cosmic profile:', {
@@ -69,9 +66,13 @@ export default function AccountDetailsScreen() {
   const goLogin = () => router.push('/auth/login');
   const goEditCosmicProfile = () => router.push('/settings/edit-profile');
 
-  // Use shared helper so iOS opens in system browser, web uses same tab
   const onOpenBillingPortal = async () => {
+    if (portalLoading) return;
     try {
+      if (!authed) {
+        Alert.alert('Sign in required', 'Please sign in to manage your subscription.');
+        return;
+      }
       setPortalLoading(true);
       console.log('[account] opening portal from', typeof window !== 'undefined' ? window.location.pathname : '(native)');
       await openBillingPortal();
@@ -101,16 +102,12 @@ export default function AccountDetailsScreen() {
       if (dateString.includes('/')) {
         const [day, month, year] = dateString.split('/');
         return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toLocaleDateString('en-GB', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
+          year: 'numeric', month: 'long', day: 'numeric'
         });
       } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
         const [year, month, day] = dateString.split('-').map(Number);
         return new Date(year, month - 1, day).toLocaleDateString('en-GB', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
+          year: 'numeric', month: 'long', day: 'numeric'
         });
       }
       return dateString;
@@ -130,7 +127,7 @@ export default function AccountDetailsScreen() {
         <CosmicBackground />
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#d4af37" />
-          <Text style={styles.loadingText}>Loading account…</Text>
+          <Text style={styles.loadingText}>Loading account...</Text>
         </View>
       </View>
     );
@@ -240,7 +237,7 @@ export default function AccountDetailsScreen() {
                 disabled={portalLoading}
               >
                 <CreditCard size={16} color="#1a1a2e" />
-                <Text style={styles.btnTextDark}>{portalLoading ? 'Opening…' : 'Manage Subscription'}</Text>
+                <Text style={styles.btnTextDark}>{portalLoading ? 'Opening...' : 'Manage Subscription'}</Text>
               </TouchableOpacity>
             </>
           ) : subActive === false ? (

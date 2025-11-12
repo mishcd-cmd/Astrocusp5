@@ -62,10 +62,14 @@ export default function SubscriptionScreen() {
   };
 
   const onOpenPortal = async () => {
+    if (actionLoading) return; // prevent double tap
     try {
       setActionLoading('portal');
-      console.log('[subscription] opening portal from', typeof window !== 'undefined' ? window.location.pathname : '(native)');
-      await openBillingPortal(); // same-tab navigation or Capacitor Browser on iOS
+      console.log(
+        '[subscription] opening portal from',
+        typeof window !== 'undefined' ? window.location.pathname : '(native)'
+      );
+      await openBillingPortal(); // same-tab on web, Capacitor Browser on iOS
     } catch (e: any) {
       console.error('[subscription] portal error', e);
       Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');
@@ -75,6 +79,7 @@ export default function SubscriptionScreen() {
   };
 
   const onUpgrade = async () => {
+    if (actionLoading) return;
     try {
       setActionLoading('upgrade');
       const res = await upgradeToYearly();
@@ -89,6 +94,7 @@ export default function SubscriptionScreen() {
   };
 
   const onSubscribeMonthly = async () => {
+    if (actionLoading) return;
     try {
       console.log('[settings/subscription] Monthly clicked - starting process...');
       setActionLoading('monthly');
@@ -120,6 +126,7 @@ export default function SubscriptionScreen() {
   };
 
   const onSubscribeYearly = async () => {
+    if (actionLoading) return;
     try {
       console.log('[settings/subscription] Yearly clicked - starting process...');
       setActionLoading('yearly');
@@ -151,6 +158,7 @@ export default function SubscriptionScreen() {
   };
 
   const onBuyOneOff = async () => {
+    if (actionLoading) return;
     try {
       console.log('[settings/subscription] One-off clicked - starting process...');
       setActionLoading('one-off');
@@ -325,7 +333,7 @@ export default function SubscriptionScreen() {
                     <Crown size={20} color="#d4af37" />
                     <Text style={styles.planName}>Monthly Plan</Text>
                   </View>
-                  <Text style={styles.planPrice}>$8.00 AUD / month</Text>
+                  <Text style={styles.planPrice}>$8.00 AUD per month</Text>
                   <Text style={styles.planDescription}>
                     Full access to all premium features with monthly billing
                   </Text>
@@ -351,7 +359,7 @@ export default function SubscriptionScreen() {
                       <Text style={styles.savingsText}>Save up to 10%</Text>
                     </View>
                   </View>
-                  <Text style={styles.planPrice}>$88.00 AUD / year</Text>
+                  <Text style={styles.planPrice}>$88.00 AUD per year</Text>
                   <Text style={styles.planEquivalent}>Only $7.33 per month</Text>
                   <Text style={styles.planDescription}>
                     Full access to all premium features with yearly savings
@@ -381,7 +389,7 @@ export default function SubscriptionScreen() {
               <Text style={styles.oneOffPrice}>$360.00 AUD</Text>
               <Text style={styles.oneOffDescription}>
                 Get a comprehensive one-time cusp analysis with detailed insights, birthstone guidance,
-                personalized cosmic profile, and a copy of the AstroCusp ebook containing all cusp 
+                personalized cosmic profile, and a copy of the AstroCusp ebook containing all cusp
                 personalities without a subscription.
               </Text>
 

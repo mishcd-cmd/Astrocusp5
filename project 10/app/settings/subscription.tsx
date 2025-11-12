@@ -61,13 +61,20 @@ export default function SubscriptionScreen() {
     else router.replace('/(tabs)/settings');
   };
 
+  // extra guard to avoid double taps
   const onOpenPortal = async () => {
+    if (actionLoading) return;
     try {
       setActionLoading('portal');
-      await openBillingPortal(); // shared helper: same tab on web, system browser on iOS
+      console.log('[subscription] open portal clicked');
+      await openBillingPortal(); // native iOS uses system Safari, web uses same tab
     } catch (e: any) {
       console.error('[subscription] portal error', e);
-      Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');
+      const msg =
+        e?.message ||
+        e?.error ||
+        'Failed to open billing portal.';
+      Alert.alert('Billing Portal', msg);
     } finally {
       setActionLoading(null);
     }
@@ -89,23 +96,19 @@ export default function SubscriptionScreen() {
 
   const onSubscribeMonthly = async () => {
     try {
-      console.log('[settings/subscription] Monthly button clicked - starting process...');
+      console.log('[settings/subscription] Monthly clicked - starting process...');
       setActionLoading('monthly');
 
       const { getCurrentUser } = await import('@/utils/auth');
       const authUser = await getCurrentUser();
       if (!authUser) {
-        console.error('[settings/subscription] No authenticated user found');
         Alert.alert('Authentication Required', 'Please sign in to subscribe.');
-        setActionLoading(null);
         return;
       }
 
       const { isStripeConfigured } = await import('@/utils/stripe');
       if (!isStripeConfigured()) {
-        console.error('[settings/subscription] Stripe not configured');
         Alert.alert('Configuration Error', 'Payment system not configured. Please contact support.');
-        setActionLoading(null);
         return;
       }
 
@@ -120,23 +123,19 @@ export default function SubscriptionScreen() {
 
   const onSubscribeYearly = async () => {
     try {
-      console.log('[settings/subscription] Yearly button clicked - starting process...');
+      console.log('[settings/subscription] Yearly clicked - starting process...');
       setActionLoading('yearly');
 
       const { getCurrentUser } = await import('@/utils/auth');
       const authUser = await getCurrentUser();
       if (!authUser) {
-        console.error('[settings/subscription] No authenticated user found');
         Alert.alert('Authentication Required', 'Please sign in to subscribe.');
-        setActionLoading(null);
         return;
       }
 
       const { isStripeConfigured } = await import('@/utils/stripe');
       if (!isStripeConfigured()) {
-        console.error('[settings/subscription] Stripe not configured');
         Alert.alert('Configuration Error', 'Payment system not configured. Please contact support.');
-        setActionLoading(null);
         return;
       }
 
@@ -151,23 +150,19 @@ export default function SubscriptionScreen() {
 
   const onBuyOneOff = async () => {
     try {
-      console.log('[settings/subscription] One-off button clicked - starting process...');
+      console.log('[settings/subscription] One-off clicked - starting process...');
       setActionLoading('one-off');
 
       const { getCurrentUser } = await import('@/utils/auth');
       const authUser = await getCurrentUser();
       if (!authUser) {
-        console.error('[settings/subscription] No authenticated user found');
         Alert.alert('Authentication Required', 'Please sign in to purchase.');
-        setActionLoading(null);
         return;
       }
 
       const { isStripeConfigured } = await import('@/utils/stripe');
       if (!isStripeConfigured()) {
-        console.error('[settings/subscription] Stripe not configured');
         Alert.alert('Configuration Error', 'Payment system not configured. Please contact support.');
-        setActionLoading(null);
         return;
       }
 
@@ -280,9 +275,13 @@ export default function SubscriptionScreen() {
 
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
-                    style={[styles.actionButton, styles.portalButton]}
+                    style={[
+                      styles.actionButton,
+                      styles.portalButton,
+                      actionLoading === 'portal' && { opacity: 0.6 },
+                    ]}
                     onPress={onOpenPortal}
-                    disabled={actionLoading === 'portal'}
+                    disabled={!!actionLoading}
                   >
                     <CreditCard size={16} color="#8b9dc3" />
                     <Text style={styles.portalButtonText}>
