@@ -3,30 +3,34 @@ import { supabase } from './supabase';
 
 export async function openBillingPortal() {
   console.log('[openBillingPortal.web] start');
-  const { data, error } = await supabase.auth.getSession();
-  if (error || !data?.session?.access_token) {
-    throw new Error('You must be signed in to manage billing');
-  }
-  const token = data.session.access_token;
 
+  // Get the current user id on the client
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData?.user?.id) {
+    console.error('[openBillingPortal.web] not authenticated', userErr);
+    throw new Error('Not signed in');
+  }
+
+  // Call Netlify function - same origin, no CORS issues
   const res = await fetch('/.netlify/functions/portal', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
+    // Send user_id explicitly to avoid any cookie parsing edge cases on Netlify
+    body: JSON.stringify({ user_id: userData.user.id }),
   });
 
   if (!res.ok) {
-    const txt = await res.text().catch(() => '');
-    console.error('[openBillingPortal.web] error response', res.status, txt);
-    throw new Error(txt || 'Server error');
+    const text = await res.text();
+    console.error('[openBillingPortal.web] error response', res.status, text);
+    throw new Error(text || 'Server misconfiguration');
   }
 
-  const json = await res.json();
-  if (!json?.url) {
-    throw new Error('No portal URL returned');
+  const { url } = await res.json();
+  if (!url) {
+    console.error('[openBillingPortal.web] no url returned');
+    throw new Error('No portal url returned');
   }
-  // Navigate in same tab
-  window.location.href = json.url;
+
+  // Navigate to Stripe portal
+  window.location.assign(url);
 }

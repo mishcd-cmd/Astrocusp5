@@ -3,15 +3,6 @@ import type { Handler } from '@netlify/functions';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2024-06-20',
-});
-
-// We’ll use the service role so we can read mapping tables regardless of RLS.
-// Make sure these 3 env vars are set in Netlify!
-const supabaseUrl = process.env.SUPABASE_URL as string;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-
 const handler: Handler = async (event) => {
   try {
     if (event.httpMethod === 'OPTIONS') {
@@ -31,45 +22,38 @@ const handler: Handler = async (event) => {
       return { statusCode: 405, body: 'Method not allowed' };
     }
 
-    if (!process.env.STRIPE_SECRET_KEY || !supabaseUrl || !supabaseServiceKey) {
+    // Required env vars
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!stripeKey || !supabaseUrl || !supabaseServiceKey) {
+      console.error('[portal] Missing envs', {
+        hasStripe: !!stripeKey,
+        hasUrl: !!supabaseUrl,
+        hasServiceKey: !!supabaseServiceKey,
+      });
       return { statusCode: 500, body: 'Server misconfiguration' };
     }
 
-    // Extract Supabase access token from cookie (Netlify passes headers in event.headers)
-    // Supabase sets sb-access-token and sb-refresh-token cookies on your custom domain.
-    const cookie = event.headers.cookie || '';
-    const sbAccessToken =
-      decodeURIComponent(
-        (cookie.match(/(?:^|;\s*)sb-access-token=([^;]+)/)?.[1] || '').trim(),
-      ) || undefined;
-
+    const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' });
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Try to identify the user (optional but good for consistency).
-    // If you don’t want to validate the JWT here, you can also accept a user_id in the POST body
-    // and look up directly — but validating is safer.
+    // Parse body for user_id
     let userId: string | null = null;
-
-    if (sbAccessToken) {
-      const { data: jwtUser } = await supabase.auth.getUser(sbAccessToken);
-      userId = jwtUser?.user?.id ?? null;
-    }
-
-    // Fallback: also accept user_id in JSON body (useful if cookies are domain-scope tricky)
-    if (!userId && event.body) {
-      try {
-        const parsed = JSON.parse(event.body);
-        if (typeof parsed?.user_id === 'string') userId = parsed.user_id;
-      } catch {
-        // ignore parse error
-      }
+    try {
+      const body = event.body ? JSON.parse(event.body) : {};
+      if (typeof body?.user_id === 'string') userId = body.user_id;
+    } catch {
+      // ignore parse error
     }
 
     if (!userId) {
+      console.error('[portal] Missing user_id in request body');
       return { statusCode: 401, body: 'Not authenticated' };
     }
 
-    // 1) Prefer the new column user_profiles.stripe_customer_id
+    // 1) Prefer user_profiles.stripe_customer_id
     let customerId: string | null = null;
 
     const { data: profileRow, error: profileErr } = await supabase
@@ -78,12 +62,8 @@ const handler: Handler = async (event) => {
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (profileErr) {
-      // Not fatal — just log.
-      console.error('[portal] profile fetch error:', profileErr);
-    } else {
-      customerId = profileRow?.stripe_customer_id ?? null;
-    }
+    if (profileErr) console.error('[portal] profile fetch error', profileErr);
+    customerId = profileRow?.stripe_customer_id ?? null;
 
     // 2) Fallback to stripe_customers mapping
     if (!customerId) {
@@ -92,15 +72,11 @@ const handler: Handler = async (event) => {
         .select('customer_id')
         .eq('user_id', userId)
         .maybeSingle();
-      if (mapErr) {
-        console.error('[portal] stripe_customers fetch error:', mapErr);
-      } else {
-        customerId = mapRow?.customer_id ?? null;
-      }
+      if (mapErr) console.error('[portal] stripe_customers fetch error', mapErr);
+      customerId = mapRow?.customer_id ?? null;
     }
 
     if (!customerId) {
-      // No subscription yet — tell client to start a plan first.
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -108,7 +84,6 @@ const handler: Handler = async (event) => {
       };
     }
 
-    // Create Billing Portal session
     const returnUrl =
       process.env.SITE_URL
         ? `${process.env.SITE_URL}/settings/account`
@@ -125,11 +100,8 @@ const handler: Handler = async (event) => {
       body: JSON.stringify({ url: session.url }),
     };
   } catch (err: any) {
-    console.error('[portal] fatal error:', err);
-    return {
-      statusCode: 500,
-      body: 'Internal error',
-    };
+    console.error('[portal] fatal error', err);
+    return { statusCode: 500, body: 'Internal error' };
   }
 };
 
