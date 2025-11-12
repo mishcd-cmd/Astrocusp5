@@ -1,67 +1,71 @@
 // project10/utils/billing.ts
-// Client helpers for subscription status and subscription actions.
-// Adjusted to your actual Supabase Edge Function routes:
-//  - Status:  /functions/v1/rapid-endpoint
-//  - Portal:  /functions/v1/swift-api  (opened via openBillingPortal)
+// Full drop-in: provides all exports your screens expect.
+// Web-first (React Native Web). Uses Stripe.js redirectToCheckout for subscribe/purchase.
+// Reads your existing env vars and calls your Supabase Edge Function for status.
 
 import { supabase } from '@/utils/supabase';
-import { openBillingPortal } from '@/utils/openBillingPortal';
 
-const BASE =
-  process.env.EXPO_PUBLIC_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-// Optional product price IDs - only used if you later add a "checkout" Edge Function
-const PRICE_MONTHLY = process.env.EXPO_PUBLIC_STRIPE_PRICE_MONTHLY;
-const PRICE_YEARLY  = process.env.EXPO_PUBLIC_STRIPE_PRICE_YEARLY;
-const PRICE_ONEOFF  = process.env.EXPO_PUBLIC_STRIPE_PRICE_ONEOFF;
-
-export type SubStatus = {
-  active: boolean;
-  plan?: 'monthly' | 'yearly' | null;
-  renewsAt?: string | null;
-  customerId?: string | null;
-  price_id?: string | null;
-  status?: string;
-  email?: string | null;
-} | null;
-
-/**
- * Quick config check used by your screen to warn the user.
- */
-export function isStripeConfigured(): boolean {
-  // Publishable key is checked elsewhere. Here we only guard "prices exist".
-  return Boolean(PRICE_MONTHLY || PRICE_YEARLY || PRICE_ONEOFF);
+// Safe env getters
+function getEnv(name: string) {
+  return (
+    (typeof process !== 'undefined' && (process.env as any)?.[name]) ||
+    (globalThis as any)?.[name] ||
+    ''
+  );
 }
 
-/**
- * Reads subscription status from your Edge Function.
- * Your function URL is .../functions/v1/rapid-endpoint
- */
+// Public environment expected in your Netlify/Stackblitz setup
+const SITE_URL = getEnv('EXPO_PUBLIC_SITE_URL') || getEnv('SITE_URL') || 'https://www.astrocusp.com.au';
+const SUPABASE_URL = getEnv('EXPO_PUBLIC_SUPABASE_URL') || getEnv('NEXT_PUBLIC_SUPABASE_URL') || '';
+const STRIPE_PUBLISHABLE_KEY = getEnv('EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY') || '';
+
+// Your Stripe price ids (already configured in your env)
+const PRICE_MONTHLY = getEnv('EXPO_PUBLIC_STRIPE_PRICE_MONTHLY') || '';
+const PRICE_YEARLY  = getEnv('EXPO_PUBLIC_STRIPE_PRICE_YEARLY') || '';
+const PRICE_ONEOFF  = getEnv('EXPO_PUBLIC_STRIPE_PRICE_ONEOFF') || '';
+
+// Edge Function names you provided in Supabase
+const FN_STATUS = 'rapid-endpoint';   // returns subscription status JSON
+// The portal is handled by utils/openBillingPortal.ts calling 'swift-api'
+
+// Types
+export type SubStatus =
+  | {
+      active: boolean;
+      plan?: 'monthly' | 'yearly' | null;
+      renewsAt?: string | null;
+      customerId?: string | null;
+      price_id?: string | null;
+      status?: string;
+      email?: string | null;
+    }
+  | null;
+
+// Utility: get the current session token
+async function getToken(): Promise<string | null> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    console.error('[billing] auth.getSession error', error);
+    return null;
+  }
+  return data?.session?.access_token || null;
+}
+
+// 1) Check subscription status via your Supabase Edge Function
 export async function getSubscriptionStatus(): Promise<SubStatus> {
   try {
-    if (!BASE) {
-      console.error('[billing] Missing Supabase URL config');
-      return { active: false, status: 'error:missing_base' };
+    if (!SUPABASE_URL) {
+      console.error('[billing] Missing EXPO_PUBLIC_SUPABASE_URL');
+      return { active: false, status: 'error:missing_supabase_url' };
     }
-
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error('[billing] auth.getSession error', error);
-      return { active: false, status: 'error:no_session' };
-    }
-
-    const token = data?.session?.access_token;
+    const token = await getToken();
     if (!token) {
-      console.warn('[billing] No session token');
       return { active: false, status: 'error:no_token' };
     }
 
-    // Call your status function name
-    const url = `${BASE}/functions/v1/rapid-endpoint`;
-
+    const url = `${SUPABASE_URL}/functions/v1/${FN_STATUS}`;
     const res = await fetch(url, {
-      method: 'POST', // use POST to be safe with CORS
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -72,7 +76,7 @@ export async function getSubscriptionStatus(): Promise<SubStatus> {
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      console.error('[billing] rapid-endpoint bad response', res.status, text);
+      console.error('[billing] status bad response', res.status, text);
       return { active: false, status: `error:${res.status}` };
     }
 
@@ -92,34 +96,64 @@ export async function getSubscriptionStatus(): Promise<SubStatus> {
   }
 }
 
-/**
- * Until you add a dedicated "checkout" Edge Function,
- * we will open the Billing Portal as a temporary path to subscribe.
- * Stripe Billing Portal can be configured to let users purchase products.
- * If you have not enabled that in Stripe, it will still let users manage billing.
- */
+// 2) Stripe Checkout helpers (web)
+// We load Stripe.js lazily so it only loads when needed
+async function getStripe() {
+  if (typeof window === 'undefined') {
+    throw new Error('Stripe Checkout is only supported on web');
+  }
+  if (!STRIPE_PUBLISHABLE_KEY) {
+    throw new Error('Stripe publishable key missing');
+  }
+  // dynamic import
+  const { loadStripe } = await import('@stripe/stripe-js');
+  const stripe = await loadStripe(STRIPE_PUBLISHABLE_KEY);
+  if (!stripe) throw new Error('Failed to load Stripe.js');
+  return stripe;
+}
 
-// Start monthly subscription
+// Common redirect to checkout
+async function redirectToCheckout(params: {
+  price: string;
+  mode: 'subscription' | 'payment';
+}) {
+  const stripe = await getStripe();
+  const success = `${SITE_URL}/settings/subscription?success=1`;
+  const cancel  = `${SITE_URL}/settings/subscription?canceled=1`;
+
+  const result = await stripe.redirectToCheckout({
+    lineItems: [{ price: params.price, quantity: 1 }],
+    mode: params.mode,
+    successUrl: success,
+    cancelUrl: cancel,
+  });
+
+  if (result.error) {
+    // Stripe returns an error object if the redirect was blocked or invalid
+    throw new Error(result.error.message || 'Stripe redirect failed');
+  }
+}
+
+// 3) Actions your screens call
+
 export async function subscribeMonthly(): Promise<void> {
-  // If later you add a "checkout" function, call it here with PRICE_MONTHLY.
-  await openBillingPortal();
+  if (!PRICE_MONTHLY) throw new Error('Monthly price not configured');
+  await redirectToCheckout({ price: PRICE_MONTHLY, mode: 'subscription' });
 }
 
-// Start yearly subscription
 export async function subscribeYearly(): Promise<void> {
-  // If later you add a "checkout" function, call it here with PRICE_YEARLY.
-  await openBillingPortal();
+  if (!PRICE_YEARLY) throw new Error('Yearly price not configured');
+  await redirectToCheckout({ price: PRICE_YEARLY, mode: 'subscription' });
 }
 
-// Buy one-off reading
 export async function buyOneOffReading(): Promise<void> {
-  // If later you add a "checkout" function, call it here with PRICE_ONEOFF.
-  await openBillingPortal();
+  if (!PRICE_ONEOFF) throw new Error('One-off price not configured');
+  await redirectToCheckout({ price: PRICE_ONEOFF, mode: 'payment' });
 }
 
-// Upgrade monthly to yearly
-export async function upgradeToYearly(): Promise<{ ok: boolean; message: string } | null> {
-  // For now, route to portal so they can change plan there.
-  await openBillingPortal();
-  return { ok: true, message: 'Opening billing portal to upgrade your plan.' };
+// Optional simple upgrade helper: just send user to the yearly checkout
+// In a real system you would call a secured backend to swap subscriptions.
+export async function upgradeToYearly(): Promise<{ ok: true; message: string }> {
+  await subscribeYearly();
+  return { ok: true, message: 'Redirecting to yearly checkout' };
 }

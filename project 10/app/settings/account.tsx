@@ -1,11 +1,12 @@
-// project 10/app/settings/account.tsx
-import React, { useEffect, useState } from 'react';
+// project10/app/settings/account.tsx
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import { User, LogOut, Crown, CreditCard, Pencil, User as User2, Calendar, Clock, MapPin, Star } from 'lucide-react-native';
-import { ArrowLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import CosmicBackground from '@/components/CosmicBackground';
+
+import { User, LogOut, Crown, CreditCard, Pencil, User as User2, Calendar, Clock, MapPin, Star, ArrowLeft } from 'lucide-react-native';
 
 import { supabase } from '@/utils/supabase';
 import { getSubscriptionStatus } from '@/utils/billing';
@@ -20,6 +21,7 @@ type SubStatus = {
   customerId?: string;
   price_id?: string;
   status?: string;
+  email?: string | null;
 } | null;
 
 export default function AccountDetailsScreen() {
@@ -30,41 +32,56 @@ export default function AccountDetailsScreen() {
   const [profile, setProfile] = useState<CosmicProfile>({});
   const [portalLoading, setPortalLoading] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const user = await getCurrentUser();
-        if (user?.email) {
-          setAuthed(true);
-          setEmail(user.email);
-
-          // Fetch subscription status
-          try {
-            const s = await getSubscriptionStatus();
-            setSubStatus(s);
-          } catch (e) {
-            console.error('[account] subscription check error', e);
-            setSubStatus({ active: false });
-          }
-
-          // Fetch cosmic profile
-          try {
-            const cosmicProfile = await getCosmicProfile();
-            setProfile(cosmicProfile || {});
-          } catch (profileError) {
-            console.error('❌ [account] profile load error', profileError);
-            setProfile({});
-          }
-        } else {
-          setAuthed(false);
+  const loadAll = useCallback(async () => {
+    try {
+      const user = await getCurrentUser();
+      if (user?.email) {
+        setAuthed(true);
+        setEmail(user.email);
+        try {
+          const s = await getSubscriptionStatus();
+          setSubStatus(s);
+        } catch (e) {
+          console.error('[account] subscription check error', e);
+          setSubStatus({ active: false });
         }
-      } catch (e) {
-        console.error('[account] load error', e);
-      } finally {
-        setLoading(false);
+        try {
+          const cosmicProfile = await getCosmicProfile();
+          setProfile(cosmicProfile || {});
+        } catch (profileError) {
+          console.error('❌ [account] profile load error', profileError);
+          setProfile({});
+        }
+      } else {
+        setAuthed(false);
+        setSubStatus({ active: false });
       }
-    })();
+    } catch (e) {
+      console.error('[account] load error', e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // initial load
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  // refresh when returning from Stripe or navigating back to this screen
+  useFocusEffect(
+    useCallback(() => {
+      // do not flash a loader if we already have data; just refresh in background
+      (async () => {
+        try {
+          const s = await getSubscriptionStatus();
+          setSubStatus(s);
+        } catch (e) {
+          console.error('[account] focus refresh error', e);
+        }
+      })();
+    }, [])
+  );
 
   const goLogin = () => router.push('/auth/login');
   const goEditCosmicProfile = () => router.push('/settings/edit-profile');
@@ -72,7 +89,7 @@ export default function AccountDetailsScreen() {
   const onOpenBillingPortal = async () => {
     try {
       setPortalLoading(true);
-      await openBillingPortal(); // unified helper uses Supabase JWT with credentials: 'omit'
+      await openBillingPortal();
     } catch (e: any) {
       console.error('[account] openBillingPortal error', e);
       Alert.alert('Billing Portal', e?.message || 'Failed to open billing portal.');
@@ -144,10 +161,21 @@ export default function AccountDetailsScreen() {
   return (
     <View style={styles.container}>
       <CosmicBackground />
-      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-        <ArrowLeft size={24} color="#8b9dc3" />
-        <Text style={styles.backText}>Back</Text>
-      </TouchableOpacity>
+
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <ArrowLeft size={24} color="#8b9dc3" />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+
+        {/* Hard exit to Horoscope to avoid “stuck after portal” */}
+        <TouchableOpacity
+          style={styles.doneButton}
+          onPress={() => router.replace('/(tabs)/astrology')}
+        >
+          <Text style={styles.doneText}>Done</Text>
+        </TouchableOpacity>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Account Details</Text>
@@ -281,13 +309,19 @@ export default function AccountDetailsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { padding: 24, gap: 20, paddingTop: 20 },
-  backButton: { flexDirection: 'row', alignItems: 'center', paddingTop: 20, paddingBottom: 10, paddingHorizontal: 24 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 20 },
+  scrollContent: { padding: 24, gap: 20, paddingTop: 16 },
+  backButton: { flexDirection: 'row', alignItems: 'center' },
   backText: { fontSize: 18, fontFamily: 'Inter-Medium', color: '#8b9dc3', marginLeft: 8 },
+  doneButton: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#8b9dc3' },
+  doneText: { color: '#1a1a2e', fontFamily: 'Inter-SemiBold', fontSize: 14 },
+
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   loadingText: { fontSize: 18, fontFamily: 'Inter-Regular', color: '#8b9dc3', marginTop: 12 },
+
   title: { fontSize: 36, color: '#e8e8e8', fontFamily: 'PlayfairDisplay-Bold', textAlign: 'center', marginBottom: 16, letterSpacing: 1 },
   card: { padding: 20, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.2)', gap: 12 },
+
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   cardTitle: { fontSize: 20, color: '#e8e8e8', fontFamily: 'Inter-SemiBold' },
   body: { fontSize: 17, color: '#c0c0c0', fontFamily: 'Inter-Regular', lineHeight: 22 },
@@ -295,11 +329,13 @@ const styles = StyleSheet.create({
   good: { color: '#4ade80', fontFamily: 'Inter-SemiBold' },
   bad: { color: '#f87171', fontFamily: 'Inter-SemiBold' },
   dim: { color: '#9ca3af', fontFamily: 'Inter-Regular' },
+
   profileDetails: { gap: 12, marginVertical: 8 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   profileContent: { flex: 1 },
   profileLabel: { fontSize: 14, fontFamily: 'Inter-Medium', color: '#8b9dc3', marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1 },
   profileValue: { fontSize: 18, fontFamily: 'Inter-Regular', color: '#e8e8e8' },
+
   btn: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 12, minHeight: 44, flexDirection: 'row', gap: 8 },
   btnPrimary: { backgroundColor: '#d4af37' },
   btnDanger: { backgroundColor: '#dc2626' },
@@ -307,6 +343,6 @@ const styles = StyleSheet.create({
   btnText: { color: '#d4af37', fontFamily: 'Inter-SemiBold', fontSize: 17 },
   btnTextDark: { color: '#1a1a2e', fontFamily: 'Inter-SemiBold', fontSize: 17 },
   btnTextLight: { color: '#ffffff', fontFamily: 'Inter-SemiBold', fontSize: 17 },
-  rowBtns: { flexDirection: 'row', gap: 12, marginTop: 12 },
+
   signOutTitle: { color: '#f87171' },
 });

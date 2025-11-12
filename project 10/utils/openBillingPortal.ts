@@ -2,9 +2,8 @@
 import { supabase } from '@/utils/supabase';
 import { Linking, Platform } from 'react-native';
 
-const BASE =
-  process.env.EXPO_PUBLIC_SUPABASE_URL ||
-  process.env.NEXT_PUBLIC_SUPABASE_URL;
+const BASE = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const FN_STRIPE_PORTAL = 'swift-api'; // your portal function name
 
 export async function openBillingPortal() {
   if (!BASE) throw new Error('Missing Supabase URL config');
@@ -14,13 +13,9 @@ export async function openBillingPortal() {
   const token = data?.session?.access_token;
   if (!token) throw new Error('Not authenticated');
 
-  // Your actual function name is "swift-api"
-  const res = await fetch(`${BASE}/functions/v1/swift-api`, {
+  const res = await fetch(`${BASE}/functions/v1/${FN_STRIPE_PORTAL}`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     credentials: 'omit',
     body: JSON.stringify({}),
   });
@@ -34,9 +29,6 @@ export async function openBillingPortal() {
   const portalUrl = json?.url as string | undefined;
   if (!portalUrl) throw new Error('Portal URL missing');
 
-  if (Platform.OS === 'web') {
-    window.location.assign(portalUrl);
-  } else {
-    await Linking.openURL(portalUrl);
-  }
+  if (Platform.OS === 'web') window.location.assign(portalUrl);
+  else await Linking.openURL(portalUrl);
 }

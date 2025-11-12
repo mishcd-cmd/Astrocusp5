@@ -9,10 +9,10 @@ import {
   ActivityIndicator,
   ScrollView,
   SafeAreaView,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Crown, CreditCard, ArrowLeft, CheckCircle, XCircle } from 'lucide-react-native';
 
 import {
@@ -60,6 +60,13 @@ export default function SubscriptionScreen() {
     refresh();
   }, [refresh]);
 
+  // Refresh every time the screen regains focus, for example after returning from Stripe
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
+
   const onMonthly = async () => {
     try {
       setBusy('monthly');
@@ -97,11 +104,17 @@ export default function SubscriptionScreen() {
     try {
       setBusy('portal');
       await openBillingPortal();
+      // When you come back, useFocusEffect will refresh automatically
     } catch (e: any) {
       Alert.alert('Billing Portal', e?.message || 'Could not open portal.');
     } finally {
       setBusy(null);
     }
+  };
+
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/horoscope');
   };
 
   const activeBadge = status?.active ? (
@@ -120,7 +133,7 @@ export default function SubscriptionScreen() {
     <View style={styles.container}>
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <TouchableOpacity style={styles.back} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.back} onPress={handleBack}>
             <ArrowLeft size={22} color="#8b9dc3" />
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
@@ -243,6 +256,14 @@ export default function SubscriptionScreen() {
           <TouchableOpacity onPress={refresh} disabled={loading} style={styles.refreshLink}>
             <Text style={styles.refreshText}>{loading ? 'Loading...' : 'Refresh status'}</Text>
           </TouchableOpacity>
+
+          {/* Hard exit in case history stack is messy after external redirects */}
+          <TouchableOpacity
+            onPress={() => router.replace('/(tabs)/horoscope')}
+            style={styles.doneButton}
+          >
+            <Text style={styles.doneText}>Done</Text>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -279,4 +300,7 @@ const styles = StyleSheet.create({
 
   refreshLink: { alignSelf: 'center', marginTop: 14 },
   refreshText: { color: '#8b9dc3', textDecorationLine: 'underline', fontFamily: 'Inter-Medium' },
+
+  doneButton: { alignSelf: 'center', marginTop: 18, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, backgroundColor: '#8b9dc3' },
+  doneText: { color: '#1a1a2e', fontFamily: 'Inter-SemiBold', fontSize: 16 },
 });
