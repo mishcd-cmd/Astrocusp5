@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
       console.log(`✅ [webhook] Successfully processed: ${event.type}`);
     } catch (eventError: any) {
       console.error(`❌ [webhook] Error processing ${event.type}:`, eventError);
-      // Still return 200 to Stripe - we received the event
+      // Still return 200 to Stripe
     }
 
     return new Response(JSON.stringify({ received: true }), {
@@ -155,7 +155,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, supabas
     // Ensure customer record exists
     await ensureCustomerRecord(customerId, authUser.id, supabase);
 
-    // CRITICAL: Ensure user profile exists in Supabase
+    // NEW: also store the customer id on user_profiles so the portal lookup is easy
+    await supabase
+      .from('user_profiles')
+      .update({
+        stripe_customer_id: customerId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', authUser.id);
+
+    // Ensure user profile exists in Supabase
     await ensureUserProfileFromWebhook(authUser.id, customerEmail, supabase);
 
     if (session.mode === 'payment' && session.payment_status === 'paid') {
@@ -179,7 +188,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session, supabas
         console.log(`✅ [webhook] One-time payment recorded: ${session.id}`);
       }
     } else if (session.mode === 'subscription') {
-      // Handle subscription - sync from Stripe
+      // Handle subscription by syncing from Stripe
       console.log('🔄 [webhook] Syncing subscription after checkout');
       console.log('🔄 [webhook] Customer ID for sync:', customerId);
       await syncSubscriptionFromStripe(customerId, supabase);
@@ -282,11 +291,11 @@ async function ensureUserProfileFromWebhook(userId: string, email: string, supab
         user_id: userId,
         email: email,
         name: email.split('@')[0],
-        birth_date: null, // Will be filled when user completes profile
+        birth_date: null,
         birth_time: null,
         birth_location: null,
         hemisphere: hemisphere,
-        cusp_result: {}, // Empty object for JSONB field
+        cusp_result: {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         last_login_at: new Date().toISOString(),
@@ -323,13 +332,14 @@ async function ensureCustomerRecord(customerId: string, userId: string, supabase
 
     const { error: customerError } = await supabase
       .from('stripe_customers')
-      .upsert({
-        user_id: userId,
-        customer_id: customerId,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'customer_id'
-      });
+      .upsert(
+        {
+          user_id: userId,
+          customer_id: customerId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'customer_id' }
+      );
 
     if (customerError) {
       console.error('❌ [webhook] Error upserting customer:', customerError);
@@ -359,13 +369,14 @@ async function syncSubscriptionFromStripe(customerId: string, supabase: any) {
       console.log(`[webhook] No subscriptions found for customer: ${customerId}`);
       
       // Update to not_started status
-      const { error } = await supabase.from('stripe_subscriptions').upsert({
-        customer_id: customerId,
-        status: 'not_started',
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'customer_id',
-      });
+      const { error } = await supabase.from('stripe_subscriptions').upsert(
+        {
+          customer_id: customerId,
+          status: 'not_started',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'customer_id' }
+      );
 
       if (error) {
         console.error('❌ [webhook] Error updating subscription status:', error);
@@ -399,9 +410,7 @@ async function syncSubscriptionFromStripe(customerId: string, supabase: any) {
     // Upsert subscription data
     const { error: subError } = await supabase.from('stripe_subscriptions').upsert(
       subscriptionData,
-      {
-        onConflict: 'customer_id',
-      },
+      { onConflict: 'customer_id' }
     );
 
     if (subError) {
