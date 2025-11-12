@@ -1,21 +1,18 @@
-// supabase/functions/stripe-portal/index.ts
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import Stripe from 'npm:stripe@17.7.0'
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1'
 
 /**
  * IMPORTANT:
- * - This function expects the client to call it with:
- *     Authorization: Bearer <supabase_jwt>
- *   and with fetch(..., { credentials: 'omit' }) to avoid cookie-based requests.
- * - Because we don't use cookies here, CORS with '*' is OK.
+ * - Client must call this with Authorization: Bearer <supabase_jwt>
+ * - Use fetch(..., { credentials: 'omit' }) on web
+ * - CORS '*' is fine since we are not using cookies
  */
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  // no Access-Control-Allow-Credentials on purpose (we are not using cookies)
 }
 
 function normalizeSiteUrl(raw?: string): string {
@@ -27,7 +24,6 @@ function normalizeSiteUrl(raw?: string): string {
 }
 
 Deno.serve(async (req) => {
-  // Preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders })
   }
@@ -56,7 +52,7 @@ Deno.serve(async (req) => {
     const stripe = new Stripe(stripeSecret, { apiVersion: '2024-06-20' })
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Authenticate the user via Supabase JWT, exactly like checkout
+    // Auth via Supabase JWT
     const authHeader = req.headers.get('authorization')
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Authentication required' }), {
@@ -79,7 +75,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Find the Stripe customer saved at checkout/webhook time
+    // Find Stripe customer
     const { data: sc, error: scError } = await supabase
       .from('stripe_customers')
       .select('customer_id')

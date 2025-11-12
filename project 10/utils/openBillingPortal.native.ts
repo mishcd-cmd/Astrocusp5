@@ -1,15 +1,16 @@
-// project 10/utils/openBillingPortal.native.ts
-import { Browser } from '@capacitor/browser'
 import { supabase } from './supabase'
+import { Linking } from 'react-native'
 
 export async function openBillingPortal() {
-  const { data: sessionData, error } = await supabase.auth.getSession()
-  if (error || !sessionData.session) {
-    throw new Error('You need to be signed in to manage billing.')
-  }
+  const { data } = await supabase.auth.getSession()
+  const session = data?.session
+  if (!session) throw new Error('You need to be signed in to manage billing.')
 
-  const jwt = sessionData.session.access_token
-  const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/stripe-portal`
+  const jwt = session.access_token
+  const base = process.env.EXPO_PUBLIC_SUPABASE_URL
+  if (!base) throw new Error('Supabase URL is not configured')
+
+  const url = `${base}/functions/v1/stripe-portal`
 
   const res = await fetch(url, {
     method: 'POST',
@@ -17,8 +18,7 @@ export async function openBillingPortal() {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${jwt}`,
     },
-    // native also doesn’t need cookies here
-    credentials: 'omit',
+    // native is not subject to browser CORS, no credentials needed
     body: JSON.stringify({}),
   })
 
@@ -35,5 +35,5 @@ export async function openBillingPortal() {
   const { url: portalUrl } = await res.json()
   if (!portalUrl) throw new Error('No portal URL returned')
 
-  await Browser.open({ url: portalUrl, presentationStyle: 'fullscreen' })
+  await Linking.openURL(portalUrl)
 }
