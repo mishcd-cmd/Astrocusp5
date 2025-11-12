@@ -35,7 +35,7 @@ export async function getSubscriptionStatus(): Promise<SubStatus> {
       return { active: false, status: 'error:no_token' };
     }
 
-    const url = `${BASE}/functions/v1/subscription-status`;
+    const url = `${BASE || 'https://fulzqbwojvrripsuoreh.supabase.co'}/functions/v1/rapid-endpoint`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {

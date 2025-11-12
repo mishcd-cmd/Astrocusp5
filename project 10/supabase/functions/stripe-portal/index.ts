@@ -1,7 +1,3 @@
-// supabase/functions/stripe-portal/index.ts
-// Creates a Stripe Billing Portal session and returns { url }.
-// Single file with full CORS and Supabase auth verification.
-
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const ORIGIN_FALLBACK = "https://www.astrocusp.com.au";
@@ -32,27 +28,20 @@ function errJson(message: string, origin: string | null, status = 400) {
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin");
 
-  // *** CRUCIAL: preflight must be 200 + headers
   if (req.method === "OPTIONS") {
     return new Response("ok", { status: 200, headers: corsHeaders(origin) });
   }
-
   if (req.method !== "POST") {
     return errJson("Method not allowed", origin, 405);
   }
-
   if (!STRIPE_SECRET) {
     return errJson("Server misconfigured (STRIPE_SECRET_KEY)", origin, 500);
   }
 
-  // Require Supabase user JWT (from client)
   const auth = req.headers.get("Authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-  if (!token) {
-    return errJson("Missing bearer token", origin, 401);
-  }
+  if (!token) return errJson("Missing bearer token", origin, 401);
 
-  // Verify user
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -60,26 +49,17 @@ Deno.serve(async (req) => {
   }
 
   const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: supabaseAnonKey,
-    },
+    headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnonKey },
   });
-
-  if (!userRes.ok) {
-    return errJson("Invalid or expired token", origin, 401);
-  }
+  if (!userRes.ok) return errJson("Invalid or expired token", origin, 401);
 
   const user = await userRes.json().catch(() => null);
   const email = user?.email as string | undefined;
   const userId = user?.id as string | undefined;
-  if (!userId) {
-    return errJson("Auth user missing", origin, 401);
-  }
+  if (!userId) return errJson("Auth user missing", origin, 401);
 
-  // Resolve or create Stripe customer (email-based)
+  // find/create customer
   let customerId: string | null = null;
-
   const search = await fetch("https://api.stripe.com/v1/customers/search", {
     method: "POST",
     headers: {
@@ -88,7 +68,6 @@ Deno.serve(async (req) => {
     },
     body: new URLSearchParams({ query: `email:"${email}"` }),
   });
-
   if (search.ok) {
     const s = await search.json();
     if (s?.data?.length > 0) customerId = s.data[0].id;
@@ -102,7 +81,6 @@ Deno.serve(async (req) => {
       },
       body: new URLSearchParams({
         email: email ?? "",
-        // Minimal metadata to link back if you later store it
         "metadata[supabase_user_id]": userId,
       }),
     });
@@ -114,7 +92,6 @@ Deno.serve(async (req) => {
     customerId = c.id;
   }
 
-  // Create Billing Portal session
   const portalRes = await fetch("https://api.stripe.com/v1/billing_portal/sessions", {
     method: "POST",
     headers: {
@@ -126,7 +103,6 @@ Deno.serve(async (req) => {
       return_url: PORTAL_RETURN_URL,
     }),
   });
-
   if (!portalRes.ok) {
     const txt = await portalRes.text();
     return errJson(`Stripe portal error: ${txt}`, origin, 500);
